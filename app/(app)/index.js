@@ -5,20 +5,23 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { orienta } from '../../src/api/orienta';
-import { useAuth } from '../../src/store/auth';
 import { registerPush } from '../../src/lib/push';
-import { COLORS } from '../../src/config';
-
-// Categorías que atiende el médico (MVP fijo; luego se editan en su perfil).
-const CATEGORIAS = ['pediatria', 'general', 'dermatologia', 'ginecologia'];
-const TARIFA = 15000;
+import { COLORS, DEFAULT_CATS, DEFAULT_TARIFA } from '../../src/config';
 
 export default function Home() {
   const router = useRouter();
-  const logout = useAuth((s) => s.logout);
   const [disponible, setDisponible] = useState(false);
 
   useEffect(() => { registerPush(); }, []);
+
+  // Perfil del médico: define su tarifa/categorías y su estado de disponibilidad real.
+  const perfil = useQuery({ queryKey: ['perfil'], queryFn: orienta.perfil });
+  useEffect(() => {
+    if (typeof perfil.data?.disponible === 'boolean') setDisponible(perfil.data.disponible);
+  }, [perfil.data?.disponible]);
+
+  const savedCats = perfil.data?.perfil?.categorias?.length ? perfil.data.perfil.categorias : DEFAULT_CATS;
+  const savedTarifa = perfil.data?.perfil?.tarifa || DEFAULT_TARIFA;
 
   const feed = useQuery({
     queryKey: ['feed'],
@@ -27,7 +30,7 @@ export default function Home() {
   });
 
   const toggle = useMutation({
-    mutationFn: (val) => orienta.setDisponibilidad(val, TARIFA, CATEGORIAS),
+    mutationFn: (val) => orienta.setDisponibilidad(val, savedTarifa, savedCats),
     onSuccess: (_res, val) => { setDisponible(val); if (val) feed.refetch(); },
     onError: (e) => Alert.alert('No se pudo cambiar el estado', e?.message || 'Error de red'),
   });
@@ -38,7 +41,9 @@ export default function Home() {
         options={{
           title: 'Orientaciones',
           headerRight: () => (
-            <TouchableOpacity onPress={logout}><Text style={st.salir}>Salir</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/perfil')}>
+              <Text style={st.salir}>Ganancias</Text>
+            </TouchableOpacity>
           ),
         }}
       />

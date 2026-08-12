@@ -4,6 +4,18 @@ export const API = {
   wp:      'https://qa.nexasalud.com/gateway/nexa/v1', // WordPress (identidad/wallet) vía /gateway
 };
 
+// Catálogo de categorías que un médico puede atender (MVP).
+export const CATEGORIAS = [
+  { id: 'general',      label: 'Medicina general' },
+  { id: 'pediatria',    label: 'Pediatría' },
+  { id: 'dermatologia', label: 'Dermatología' },
+  { id: 'ginecologia',  label: 'Ginecología' },
+  { id: 'nutricion',    label: 'Nutrición' },
+  { id: 'psicologia',   label: 'Psicología' },
+];
+export const DEFAULT_CATS = ['general', 'pediatria'];
+export const DEFAULT_TARIFA = 8000;
+
 // Paleta NexaSalud
 export const COLORS = {
   navy:  '#0A1B3F',

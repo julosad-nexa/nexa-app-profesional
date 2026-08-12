@@ -10,6 +10,11 @@ export const orienta = {
 
   feed: () => O('/orienta/medico/feed'),
 
+  perfil: () => O('/orienta/medico/perfil'),
+
+  guardarPerfil: (tarifa, categorias) =>
+    O('/orienta/medico/perfil', { method: 'POST', body: { tarifa, categorias } }),
+
   detalle: (id) => O(`/orienta/solicitudes/${id}`),
 
   aceptar: (id) => O(`/orienta/solicitudes/${id}/aceptar`, { method: 'POST' }),
