@@ -7,12 +7,22 @@ export async function request(base, path, { method = 'GET', body, auth = true } 
     const token = useAuth.getState().token;
     if (token) headers.Authorization = `Bearer ${token}`;
   }
-  const res = await fetch(`${base}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const url = `${base}${path}`;
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (netErr) {
+    console.warn('[NEXA][net-fail]', method, url, String(netErr));
+    const e = new Error(`Red: ${String(netErr?.message || netErr)}`);
+    e.status = 0;
+    throw e;
+  }
   const data = await res.json().catch(() => ({}));
+  if (!res.ok) console.warn('[NEXA][http]', res.status, method, url, JSON.stringify(data));
 
   if (res.status === 401) {
     useAuth.getState().logout();

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, Switch, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
+  View, Text, Switch, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -29,6 +29,7 @@ export default function Home() {
   const toggle = useMutation({
     mutationFn: (val) => orienta.setDisponibilidad(val, TARIFA, CATEGORIAS),
     onSuccess: (_res, val) => { setDisponible(val); if (val) feed.refetch(); },
+    onError: (e) => Alert.alert('No se pudo cambiar el estado', e?.message || 'Error de red'),
   });
 
   return (
@@ -54,6 +55,14 @@ export default function Home() {
           disabled={toggle.isPending}
         />
       </View>
+
+      {toggle.isError && (
+        <View style={st.errBox}>
+          <Text style={st.errT}>
+            {`⚠ ${toggle.error?.status ? `[${toggle.error.status}] ` : ''}${toggle.error?.message || 'Error'}`}
+          </Text>
+        </View>
+      )}
 
       <FlatList
         contentContainerStyle={{ padding: 16 }}
@@ -87,6 +96,8 @@ const st = StyleSheet.create({
   availT: { fontSize: 17, fontWeight: '800', color: COLORS.ink },
   availS: { fontSize: 12, color: COLORS.ink2, marginTop: 2 },
   empty: { textAlign: 'center', color: COLORS.ink2, marginTop: 40, paddingHorizontal: 20 },
+  errBox: { backgroundColor: '#FDECEC', borderColor: '#E5534B', borderWidth: 1, borderRadius: 10, marginHorizontal: 16, marginTop: 10, padding: 12 },
+  errT: { color: '#B4231B', fontSize: 13, fontWeight: '700' },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: COLORS.line },
   badge: { alignSelf: 'flex-start', backgroundColor: 'rgba(0,166,156,0.12)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, marginBottom: 8 },
   badgeT: { color: COLORS.tealD, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
