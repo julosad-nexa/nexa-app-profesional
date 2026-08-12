@@ -7,7 +7,9 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": { "backgroundColor": "#0A1B3F" },
+    "splash": {
+      "backgroundColor": "#0A1B3F"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.nexasalud.profesional"
@@ -18,8 +20,15 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      ["expo-notifications", {}]
+      [
+        "expo-notifications",
+        {}
+      ],
+      "expo-asset",
+      "expo-font"
     ],
-    "extra": { "router": {} }
+    "extra": {
+      "router": {}
+    }
   }
 }
