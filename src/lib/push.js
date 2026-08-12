@@ -1,6 +1,10 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { orienta } from '../api/orienta';
+
+// Expo Go (SDK 53+) no soporta push remoto — solo un development build.
+const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -12,7 +16,8 @@ Notifications.setNotificationHandler({
 
 // Pide permiso, obtiene el Expo push token y lo registra en nexa-orienta.
 export async function registerPush() {
-  if (!Device.isDevice) return null; // los simuladores no reciben push
+  if (IS_EXPO_GO) return null;        // en Expo Go se prueba el flujo sin push (feed por polling)
+  if (!Device.isDevice) return null;  // los simuladores no reciben push
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
     let status = existing;
