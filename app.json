@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "NexaSalud App Profesional",
+    "slug": "nexasalud-app-profesional",
+    "scheme": "nexaprofesional",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": { "backgroundColor": "#0A1B3F" },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.nexasalud.profesional"
+    },
+    "android": {
+      "package": "com.nexasalud.profesional"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-notifications", {}]
+    ],
+    "extra": { "router": {} }
+  }
+}

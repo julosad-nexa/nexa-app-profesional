@@ -1,0 +1,95 @@
+import { useEffect, useState } from 'react';
+import {
+  View, Text, Switch, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
+} from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { orienta } from '../../src/api/orienta';
+import { useAuth } from '../../src/store/auth';
+import { registerPush } from '../../src/lib/push';
+import { COLORS } from '../../src/config';
+
+// Categorías que atiende el médico (MVP fijo; luego se editan en su perfil).
+const CATEGORIAS = ['pediatria', 'general', 'dermatologia', 'ginecologia'];
+const TARIFA = 15000;
+
+export default function Home() {
+  const router = useRouter();
+  const logout = useAuth((s) => s.logout);
+  const [disponible, setDisponible] = useState(false);
+
+  useEffect(() => { registerPush(); }, []);
+
+  const feed = useQuery({
+    queryKey: ['feed'],
+    queryFn: orienta.feed,
+    refetchInterval: disponible ? 8000 : false, // solo hace polling si está disponible
+  });
+
+  const toggle = useMutation({
+    mutationFn: (val) => orienta.setDisponibilidad(val, TARIFA, CATEGORIAS),
+    onSuccess: (_res, val) => { setDisponible(val); if (val) feed.refetch(); },
+  });
+
+  return (
+    <View style={st.c}>
+      <Stack.Screen
+        options={{
+          title: 'Orientaciones',
+          headerRight: () => (
+            <TouchableOpacity onPress={logout}><Text style={st.salir}>Salir</Text></TouchableOpacity>
+          ),
+        }}
+      />
+
+      <View style={[st.avail, { borderColor: disponible ? COLORS.teal : COLORS.line }]}>
+        <View>
+          <Text style={st.availT}>{disponible ? 'Disponible' : 'Ocupado'}</Text>
+          <Text style={st.availS}>{disponible ? 'Recibes solicitudes' : 'Actívate para atender'}</Text>
+        </View>
+        <Switch
+          value={disponible}
+          onValueChange={(v) => toggle.mutate(v)}
+          trackColor={{ true: COLORS.teal }}
+          disabled={toggle.isPending}
+        />
+      </View>
+
+      <FlatList
+        contentContainerStyle={{ padding: 16 }}
+        data={feed.data?.feed || []}
+        keyExtractor={(x) => String(x.id)}
+        refreshControl={<RefreshControl refreshing={feed.isFetching} onRefresh={feed.refetch} />}
+        ListEmptyComponent={
+          <Text style={st.empty}>
+            {disponible ? 'Sin solicitudes por ahora…' : 'Ponte Disponible para recibir solicitudes.'}
+          </Text>
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity style={st.card} onPress={() => router.push(`/solicitud/${item.id}`)} activeOpacity={0.8}>
+            <View style={st.badge}><Text style={st.badgeT}>{item.categoria}</Text></View>
+            <Text style={st.txt} numberOfLines={2}>{item.texto}</Text>
+            <Text style={st.cta}>Ver y aceptar →</Text>
+          </TouchableOpacity>
+        )}
+      />
+    </View>
+  );
+}
+
+const st = StyleSheet.create({
+  c: { flex: 1, backgroundColor: COLORS.bg },
+  salir: { color: '#fff', fontWeight: '700' },
+  avail: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#fff', margin: 16, marginBottom: 0, padding: 16, borderRadius: 14, borderWidth: 1.5,
+  },
+  availT: { fontSize: 17, fontWeight: '800', color: COLORS.ink },
+  availS: { fontSize: 12, color: COLORS.ink2, marginTop: 2 },
+  empty: { textAlign: 'center', color: COLORS.ink2, marginTop: 40, paddingHorizontal: 20 },
+  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: COLORS.line },
+  badge: { alignSelf: 'flex-start', backgroundColor: 'rgba(0,166,156,0.12)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, marginBottom: 8 },
+  badgeT: { color: COLORS.tealD, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  txt: { color: COLORS.ink, fontSize: 15, lineHeight: 21 },
+  cta: { color: COLORS.teal, fontWeight: '800', marginTop: 10 },
+});
