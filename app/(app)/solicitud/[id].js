@@ -54,6 +54,12 @@ export default function SolicitudDetalle() {
   const finalizar = useMutation({
     mutationFn: () => orienta.cerrar(id),
     onSuccess: (res) => {
+      if (res?.estado === 'reembolsada' || res?.sin_atencion) {
+        Alert.alert('Sin atención registrada',
+          'No respondiste al paciente, así que se reembolsó su crédito y no hay pago por esta orientación.',
+          [{ text: 'Entendido', onPress: () => router.back() }]);
+        return;
+      }
       const liq = res?.liquidacion;
       Alert.alert('Orientación finalizada',
         liq ? `Ganaste ${cop(liq.neto_medico)} por esta orientación.` : 'La orientación fue cerrada.',
@@ -188,11 +194,19 @@ export default function SolicitudDetalle() {
                   <Text style={st.sendT}>Enviar</Text>
                 </TouchableOpacity>
               </View>
+              {sol.estado === 'asignada' && (
+                <Text style={st.finishHint}>Responde al paciente antes de finalizar (si cierras sin atender, se le reembolsa y no hay pago).</Text>
+              )}
               <View style={st.actionsRow}>
                 <TouchableOpacity style={st.derivar} onPress={confirmarDerivar} disabled={derivar.isPending} activeOpacity={0.85}>
                   {derivar.isPending ? <ActivityIndicator color="#B4231B" /> : <Text style={st.derivarT}>Derivar a urgencias</Text>}
                 </TouchableOpacity>
-                <TouchableOpacity style={st.finish} onPress={confirmarFinalizar} disabled={finalizar.isPending} activeOpacity={0.85}>
+                <TouchableOpacity
+                  style={[st.finish, sol.estado !== 'respondida' && st.finishDisabled]}
+                  onPress={confirmarFinalizar}
+                  disabled={finalizar.isPending || sol.estado !== 'respondida'}
+                  activeOpacity={0.85}
+                >
                   {finalizar.isPending ? <ActivityIndicator color={COLORS.tealD} /> : <Text style={st.finishT}>Finalizar</Text>}
                 </TouchableOpacity>
               </View>
@@ -298,7 +312,9 @@ const st = StyleSheet.create({
   derivar: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5534B' },
   derivarT: { color: '#B4231B', fontWeight: '800', fontSize: 14 },
   finish: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.teal },
+  finishDisabled: { opacity: 0.4 },
   finishT: { color: COLORS.tealD, fontWeight: '800', fontSize: 14 },
+  finishHint: { fontSize: 11, color: '#92400E', paddingHorizontal: 16, paddingBottom: 6 },
   closed: { textAlign: 'center', color: COLORS.ink2, padding: 16 },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: '70%' },
