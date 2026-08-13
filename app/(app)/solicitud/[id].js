@@ -3,13 +3,16 @@ import {
   View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, ActivityIndicator,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { orienta } from '../../../src/api/orienta';
 import { COLORS } from '../../../src/config';
 
+const cop = (n) => '$' + Number(n || 0).toLocaleString('es-CO');
+
 export default function SolicitudDetalle() {
   const { id } = useLocalSearchParams();
+  const router = useRouter();
   const [texto, setTexto] = useState('');
 
   const q = useQuery({
@@ -31,6 +34,29 @@ export default function SolicitudDetalle() {
     onSuccess: () => { setTexto(''); q.refetch(); },
     onError: (e) => Alert.alert('No se pudo enviar', e.message),
   });
+
+  const finalizar = useMutation({
+    mutationFn: () => orienta.cerrar(id),
+    onSuccess: (res) => {
+      const liq = res?.liquidacion;
+      Alert.alert(
+        'Orientación finalizada',
+        liq ? `Ganaste ${cop(liq.neto_medico)} por esta orientación.` : 'La orientación fue cerrada.',
+        [{ text: 'Listo', onPress: () => router.back() }]
+      );
+    },
+    onError: (e) => Alert.alert('No se pudo finalizar', e.message),
+  });
+
+  const confirmarFinalizar = () =>
+    Alert.alert(
+      'Finalizar orientación',
+      'Se cerrará la orientación y se registrará tu pago. El paciente ya no podrá escribir. ¿Continuar?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Finalizar', style: 'destructive', onPress: () => finalizar.mutate() },
+      ]
+    );
 
   const puedeChatear = sol && ['asignada', 'respondida'].includes(sol.estado);
 
@@ -91,6 +117,11 @@ export default function SolicitudDetalle() {
                   <Text style={st.sendT}>Enviar</Text>
                 </TouchableOpacity>
               </View>
+              <TouchableOpacity style={st.finish} onPress={confirmarFinalizar} disabled={finalizar.isPending} activeOpacity={0.85}>
+                {finalizar.isPending
+                  ? <ActivityIndicator color={COLORS.tealD} />
+                  : <Text style={st.finishT}>Finalizar orientación</Text>}
+              </TouchableOpacity>
             </>
           )}
 
@@ -122,4 +153,6 @@ const st = StyleSheet.create({
   send: { backgroundColor: COLORS.navy, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12 },
   sendT: { color: '#fff', fontWeight: '800' },
   closed: { textAlign: 'center', color: COLORS.ink2, padding: 16 },
+  finish: { alignItems: 'center', paddingVertical: 12, marginHorizontal: 12, marginBottom: 12, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.teal },
+  finishT: { color: COLORS.tealD, fontWeight: '800', fontSize: 15 },
 });

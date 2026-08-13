@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, Switch, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert,
+  View, Text, Switch, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert, AppState,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { orienta } from '../../src/api/orienta';
 import { registerPush } from '../../src/lib/push';
 import { COLORS, DEFAULT_CATS, DEFAULT_TARIFA } from '../../src/config';
+
+const HEARTBEAT_MS = 4 * 60 * 1000; // re-pinga cada 4 min (TTL Redis = 8 min)
 
 export default function Home() {
   const router = useRouter();
@@ -34,6 +37,32 @@ export default function Home() {
     onSuccess: (_res, val) => { setDisponible(val); if (val) feed.refetch(); },
     onError: (e) => Alert.alert('No se pudo cambiar el estado', e?.message || 'Error de red'),
   });
+
+  // Heartbeat: mantiene viva la disponibilidad en Redis (TTL 8 min) mientras esté
+  // Disponible. Sin esto el médico "cae" del índice a los 8 min sin darse cuenta.
+  // También re-pinga y refresca el feed al volver la app a primer plano.
+  useEffect(() => {
+    if (!disponible) return;
+    const ping = () => orienta.setDisponibilidad(true, savedTarifa, savedCats).catch(() => {});
+    const id = setInterval(ping, HEARTBEAT_MS);
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') { ping(); feed.refetch(); }
+    });
+    return () => { clearInterval(id); sub.remove(); };
+  }, [disponible, savedTarifa, savedCats]);
+
+  // Alerta (vibración) cuando llega una solicitud nueva al feed estando Disponible.
+  const knownIdsRef = useRef(null); // null = feed aún no cargado
+  useEffect(() => {
+    if (!disponible) { knownIdsRef.current = null; return; }
+    const items = feed.data?.feed || [];
+    const ids = new Set(items.map((x) => x.id));
+    if (knownIdsRef.current) {
+      const hayNueva = items.some((x) => !knownIdsRef.current.has(x.id));
+      if (hayNueva) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
+    knownIdsRef.current = ids;
+  }, [feed.data, disponible]);
 
   return (
     <View style={st.c}>
