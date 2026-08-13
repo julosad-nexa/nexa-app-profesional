@@ -30,6 +30,9 @@ export const orienta = {
   guardarPerfil: (tarifa, categorias) =>
     O('/orienta/medico/perfil', { method: 'POST', body: { tarifa, categorias } }),
 
+  enviarVerificacion: (data) =>
+    O('/orienta/medico/verificacion', { method: 'POST', body: data }),
+
   detalle: (id) => O(`/orienta/solicitudes/${id}`),
 
   aceptar: (id) => O(`/orienta/solicitudes/${id}/aceptar`, { method: 'POST' }),

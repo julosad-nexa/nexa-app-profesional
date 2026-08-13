@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -13,13 +13,28 @@ export default function Perfil() {
   const [cats, setCats] = useState([]);
   const [dirty, setDirty] = useState(false);
 
+  const [verif, setVerif] = useState({ registro_profesional: '', especialidad: '', documento: '' });
+
   const q = useQuery({ queryKey: ['perfil'], queryFn: orienta.perfil });
   const cfg = useQuery({ queryKey: ['config-publica'], queryFn: configPublica });
 
-  // Sembrar categorías del médico una sola vez.
+  // Sembrar categorías y datos de verificación del médico una sola vez.
   useEffect(() => {
     if (q.data?.perfil && !dirty) setCats(q.data.perfil.categorias || []);
+    const v = q.data?.verificacion;
+    if (v) setVerif((prev) =>
+      (prev.registro_profesional || prev.especialidad) ? prev : {
+        registro_profesional: v.registro_profesional || '',
+        especialidad: v.especialidad || '',
+        documento: v.documento || '',
+      });
   }, [q.data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const verificar = useMutation({
+    mutationFn: () => orienta.enviarVerificacion(verif),
+    onSuccess: () => { q.refetch(); Alert.alert('Enviado', 'Tus datos quedaron en revisión. Te avisaremos al verificarte.'); },
+    onError: (e) => Alert.alert('No se pudo enviar', e?.message || 'Error'),
+  });
 
   const guardar = useMutation({
     // La tarifa la fija NexaSalud (config); el médico solo elige categorías.
@@ -36,6 +51,9 @@ export default function Perfil() {
   const g = q.data?.ganancias;
   const rating = q.data?.perfil?.rating;
   const categorias = cfg.data?.categorias || []; // catálogo con payout desde la config
+  const v = q.data?.verificacion;
+  const verificado = v?.verificado;
+  const setV = (k, val) => setVerif((p) => ({ ...p, [k]: val }));
 
   return (
     <ScrollView style={st.c} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
@@ -58,6 +76,36 @@ export default function Perfil() {
             <View style={st.metric}><Text style={st.mLabel}>Pagado</Text><Text style={st.mValue}>{cop(g?.liquidado)}</Text></View>
             <View style={st.metric}><Text style={st.mLabel}>Calificación</Text><Text style={st.mValue}>{rating != null ? `${rating}★` : '—'}</Text></View>
           </View>
+
+          {/* Verificación profesional (ReTHUS) */}
+          <Text style={st.section}>Verificación profesional</Text>
+          {verificado ? (
+            <View style={st.verOk}>
+              <Text style={st.verOkT}>✓ Cuenta verificada</Text>
+              <Text style={st.verOkS}>{v?.especialidad}{v?.registro_profesional ? ` · Reg. ${v.registro_profesional}` : ''}</Text>
+            </View>
+          ) : (
+            <View style={st.verBox}>
+              {v?.estado === 'pendiente' && <Text style={[st.verBadge, st.verPend]}>En revisión</Text>}
+              {v?.estado === 'rechazado' && (
+                <Text style={[st.verBadge, st.verRej]}>Rechazada{v?.motivo_rechazo ? `: ${v.motivo_rechazo}` : ''}</Text>
+              )}
+              <Text style={st.hint}>Debes verificarte para recibir orientaciones. Ingresa tus datos profesionales (los validamos contra ReTHUS).</Text>
+              <TextInput style={st.vin} placeholder="Registro / Tarjeta profesional" placeholderTextColor="#94A3B8"
+                value={verif.registro_profesional} onChangeText={(t) => setV('registro_profesional', t)} autoCapitalize="characters" />
+              <TextInput style={st.vin} placeholder="Especialidad (ej. Medicina general)" placeholderTextColor="#94A3B8"
+                value={verif.especialidad} onChangeText={(t) => setV('especialidad', t)} />
+              <TextInput style={st.vin} placeholder="Documento de identidad (opcional)" placeholderTextColor="#94A3B8"
+                value={verif.documento} onChangeText={(t) => setV('documento', t)} keyboardType="number-pad" />
+              <TouchableOpacity
+                style={[st.verSend, { opacity: verif.registro_profesional && verif.especialidad && !verificar.isPending ? 1 : 0.5 }]}
+                onPress={() => verif.registro_profesional && verif.especialidad && verificar.mutate()}
+                disabled={!verif.registro_profesional || !verif.especialidad || verificar.isPending}
+              >
+                {verificar.isPending ? <ActivityIndicator color="#fff" /> : <Text style={st.verSendT}>{v?.estado === 'pendiente' || v?.estado === 'rechazado' ? 'Actualizar datos' : 'Enviar para verificación'}</Text>}
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Categorías que atiende + payout (tarifa fijada por NexaSalud) */}
           <Text style={st.section}>Categorías que atiendes</Text>
@@ -115,6 +163,16 @@ const st = StyleSheet.create({
   mValue: { color: COLORS.ink, fontSize: 18, fontWeight: '800', marginTop: 6 },
   section: { color: COLORS.ink, fontSize: 16, fontWeight: '800', marginTop: 24 },
   hint: { color: COLORS.ink2, fontSize: 12, marginTop: 3, marginBottom: 12, lineHeight: 17 },
+  verOk: { backgroundColor: 'rgba(0,166,156,0.10)', borderWidth: 1, borderColor: COLORS.teal, borderRadius: 14, padding: 14, marginTop: 10 },
+  verOkT: { color: COLORS.tealD, fontWeight: '800', fontSize: 15 },
+  verOkS: { color: COLORS.ink2, fontSize: 13, marginTop: 2 },
+  verBox: { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.line, borderRadius: 14, padding: 14, marginTop: 10 },
+  verBadge: { alignSelf: 'flex-start', fontSize: 12, fontWeight: '800', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden', marginBottom: 8 },
+  verPend: { backgroundColor: 'rgba(245,158,11,0.15)', color: '#92400E' },
+  verRej: { backgroundColor: '#FDECEC', color: '#B4231B' },
+  vin: { backgroundColor: COLORS.bg, borderWidth: 1, borderColor: COLORS.line, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: COLORS.ink, marginBottom: 8 },
+  verSend: { backgroundColor: COLORS.navy, borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 4 },
+  verSendT: { color: '#fff', fontWeight: '800' },
   cardList: { gap: 10 },
   catRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1.5, borderColor: COLORS.line },
   catRowOn: { borderColor: COLORS.teal, backgroundColor: 'rgba(0,166,156,0.05)' },
