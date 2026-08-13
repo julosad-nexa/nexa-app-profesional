@@ -104,7 +104,7 @@ export default function SolicitudDetalle() {
   return (
     <KeyboardAvoidingView
       style={st.c}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
     >
       <Stack.Screen options={{ title: `Solicitud #${id}` }} />
