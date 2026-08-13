@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -13,27 +13,18 @@ export default function Perfil() {
   const [cats, setCats] = useState([]);
   const [dirty, setDirty] = useState(false);
 
-  const [verif, setVerif] = useState({ registro_profesional: '', especialidad: '', documento: '' });
-
   const q = useQuery({ queryKey: ['perfil'], queryFn: orienta.perfil });
   const cfg = useQuery({ queryKey: ['config-publica'], queryFn: configPublica });
   const pay = useQuery({ queryKey: ['payouts'], queryFn: orienta.payouts });
 
-  // Sembrar categorías y datos de verificación del médico una sola vez.
+  // Sembrar las categorías que el médico atiende (una sola vez).
   useEffect(() => {
     if (q.data?.perfil && !dirty) setCats(q.data.perfil.categorias || []);
-    const v = q.data?.verificacion;
-    if (v) setVerif((prev) =>
-      (prev.registro_profesional || prev.especialidad) ? prev : {
-        registro_profesional: v.registro_profesional || '',
-        especialidad: v.especialidad || '',
-        documento: v.documento || '',
-      });
   }, [q.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const verificar = useMutation({
-    mutationFn: () => orienta.enviarVerificacion(verif),
-    onSuccess: () => { q.refetch(); Alert.alert('Enviado', 'Tus datos quedaron en revisión. Te avisaremos al verificarte.'); },
+  const solicitar = useMutation({
+    mutationFn: () => orienta.enviarVerificacion({}),
+    onSuccess: () => { q.refetch(); Alert.alert('Solicitud enviada', 'Un administrador habilitará tu cuenta para teleorientación.'); },
     onError: (e) => Alert.alert('No se pudo enviar', e?.message || 'Error'),
   });
 
@@ -51,10 +42,11 @@ export default function Perfil() {
 
   const g = q.data?.ganancias;
   const cal = q.data?.calificaciones;
-  const categorias = cfg.data?.categorias || []; // catálogo con payout desde la config
   const v = q.data?.verificacion;
   const verificado = v?.verificado;
-  const setV = (k, val) => setVerif((p) => ({ ...p, [k]: val }));
+  // Categorías autorizadas (derivadas de la especialidad certificada) = set seleccionable.
+  const autorizadas = q.data?.perfil?.categorias_autorizadas || [];
+  const categorias = (cfg.data?.categorias || []).filter((c) => autorizadas.includes(c.id));
 
   return (
     <ScrollView style={st.c} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
@@ -82,12 +74,14 @@ export default function Perfil() {
             </View>
           </View>
 
-          {/* Verificación profesional (ReTHUS) */}
-          <Text style={st.section}>Verificación profesional</Text>
+          {/* Habilitación para teleorientación */}
+          <Text style={st.section}>Habilitación para teleorientación</Text>
           {verificado ? (
             <View style={st.verOk}>
-              <Text style={st.verOkT}>✓ Cuenta verificada</Text>
-              <Text style={st.verOkS}>{v?.especialidad}{v?.registro_profesional ? ` · Reg. ${v.registro_profesional}` : ''}</Text>
+              <Text style={st.verOkT}>✓ Cuenta habilitada</Text>
+              <Text style={st.verOkS}>
+                Autorizado en: {autorizadas.length ? autorizadas.map(catLabel).join(', ') : '—'}
+              </Text>
             </View>
           ) : (
             <View style={st.verBox}>
@@ -95,57 +89,54 @@ export default function Perfil() {
               {v?.estado === 'rechazado' && (
                 <Text style={[st.verBadge, st.verRej]}>Rechazada{v?.motivo_rechazo ? `: ${v.motivo_rechazo}` : ''}</Text>
               )}
-              <Text style={st.hint}>Debes verificarte para recibir orientaciones. Ingresa tus datos profesionales (los validamos contra ReTHUS).</Text>
-              <TextInput style={st.vin} placeholder="Registro / Tarjeta profesional" placeholderTextColor="#94A3B8"
-                value={verif.registro_profesional} onChangeText={(t) => setV('registro_profesional', t)} autoCapitalize="characters" />
-              <TextInput style={st.vin} placeholder="Especialidad (ej. Medicina general)" placeholderTextColor="#94A3B8"
-                value={verif.especialidad} onChangeText={(t) => setV('especialidad', t)} />
-              <TextInput style={st.vin} placeholder="Documento de identidad (opcional)" placeholderTextColor="#94A3B8"
-                value={verif.documento} onChangeText={(t) => setV('documento', t)} keyboardType="number-pad" />
+              <Text style={st.hint}>
+                Para atender teleorientaciones debes estar registrado como profesional en NexaSalud. Tus categorías
+                se habilitan automáticamente según tu especialidad certificada.
+              </Text>
+              {v?.estado !== 'pendiente' && (
+                <TouchableOpacity
+                  style={[st.verSend, { opacity: solicitar.isPending ? 0.5 : 1 }]}
+                  onPress={() => solicitar.mutate()} disabled={solicitar.isPending}
+                >
+                  {solicitar.isPending ? <ActivityIndicator color="#fff" /> : <Text style={st.verSendT}>Solicitar habilitación</Text>}
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Categorías que atiende (solo dentro de las autorizadas) */}
+          {verificado && autorizadas.length > 0 && (
+            <>
+              <Text style={st.section}>Categorías que atiendes</Text>
+              <Text style={st.hint}>
+                Solo puedes atender las autorizadas por tu especialidad. Elige cuáles activar; el pago lo define NexaSalud.
+              </Text>
+              <View style={st.cardList}>
+                {categorias.map((c) => {
+                  const on = cats.includes(c.id);
+                  return (
+                    <TouchableOpacity key={c.id} style={[st.catRow, on && st.catRowOn]} onPress={() => toggleCat(c.id)} activeOpacity={0.8}>
+                      <View style={[st.check, on && st.checkOn]}>{on && <Text style={st.checkMark}>✓</Text>}</View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[st.catName, on && st.catNameOn]}>{c.label}</Text>
+                        <Text style={st.catMeta}>{c.creditos} créd. · precio {cop(c.precio)}</Text>
+                      </View>
+                      <Text style={[st.catPay, on && st.catPayOn]}>ganas {cop(c.payout)}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               <TouchableOpacity
-                style={[st.verSend, { opacity: verif.registro_profesional && verif.especialidad && !verificar.isPending ? 1 : 0.5 }]}
-                onPress={() => verif.registro_profesional && verif.especialidad && verificar.mutate()}
-                disabled={!verif.registro_profesional || !verif.especialidad || verificar.isPending}
+                style={[st.save, { opacity: dirty && !guardar.isPending ? 1 : 0.5 }]}
+                onPress={() => dirty && guardar.mutate()}
+                disabled={!dirty || guardar.isPending}
+                activeOpacity={0.85}
               >
-                {verificar.isPending ? <ActivityIndicator color="#fff" /> : <Text style={st.verSendT}>{v?.estado === 'pendiente' || v?.estado === 'rechazado' ? 'Actualizar datos' : 'Enviar para verificación'}</Text>}
+                {guardar.isPending ? <ActivityIndicator color="#fff" /> : <Text style={st.saveT}>Guardar cambios</Text>}
               </TouchableOpacity>
-            </View>
+            </>
           )}
-
-          {/* Categorías que atiende + payout (tarifa fijada por NexaSalud) */}
-          <Text style={st.section}>Categorías que atiendes</Text>
-          <Text style={st.hint}>
-            Recibes orientaciones solo de las categorías seleccionadas. El pago por cada una lo define NexaSalud.
-          </Text>
-
-          {cfg.isLoading ? (
-            <ActivityIndicator style={{ marginVertical: 20 }} color={COLORS.teal} />
-          ) : (
-            <View style={st.cardList}>
-              {categorias.map((c) => {
-                const on = cats.includes(c.id);
-                return (
-                  <TouchableOpacity key={c.id} style={[st.catRow, on && st.catRowOn]} onPress={() => toggleCat(c.id)} activeOpacity={0.8}>
-                    <View style={[st.check, on && st.checkOn]}>{on && <Text style={st.checkMark}>✓</Text>}</View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[st.catName, on && st.catNameOn]}>{c.label}</Text>
-                      <Text style={st.catMeta}>{c.creditos} créd. · precio {cop(c.precio)}</Text>
-                    </View>
-                    <Text style={[st.catPay, on && st.catPayOn]}>ganas {cop(c.payout)}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[st.save, { opacity: dirty && !guardar.isPending ? 1 : 0.5 }]}
-            onPress={() => dirty && guardar.mutate()}
-            disabled={!dirty || guardar.isPending}
-            activeOpacity={0.85}
-          >
-            {guardar.isPending ? <ActivityIndicator color="#fff" /> : <Text style={st.saveT}>Guardar cambios</Text>}
-          </TouchableOpacity>
 
           {/* Historial de pagos */}
           <Text style={st.section}>Historial de pagos</Text>
