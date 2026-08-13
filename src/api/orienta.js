@@ -3,6 +3,9 @@ import { API } from '../config';
 
 const O = (path, opts) => request(API.orienta, path, opts);
 
+// Precios/planes públicos (los sirve WP desde la config del admin).
+export const configPublica = () => request(API.wp, '/orienta/config');
+
 // Endpoints del microservicio nexa-orienta consumidos por el médico.
 export const orienta = {
   setDisponibilidad: (disponible, tarifa, categorias) =>
