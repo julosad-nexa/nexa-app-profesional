@@ -12,6 +12,13 @@ export const orienta = {
 
   perfil: () => O('/orienta/medico/perfil'),
 
+  historial: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    ).toString();
+    return O(`/orienta/medico/historial${qs ? `?${qs}` : ''}`);
+  },
+
   guardarPerfil: (tarifa, categorias) =>
     O('/orienta/medico/perfil', { method: 'POST', body: { tarifa, categorias } }),
 

@@ -16,6 +16,29 @@ export const CATEGORIAS = [
 export const DEFAULT_CATS = ['general', 'pediatria'];
 export const DEFAULT_TARIFA = 8000;
 
+// Etiqueta legible de una categoría por su id.
+export const catLabel = (id) => CATEGORIAS.find((c) => c.id === id)?.label || id;
+
+// Formato moneda COP.
+export const cop = (n) => '$' + Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+
+// "hace X min/h/d" a partir de un datetime del backend ("YYYY-MM-DD HH:MM:SS").
+export function haceTiempo(dt) {
+  if (!dt) return '';
+  const s = Math.max(0, Math.floor((Date.now() - new Date(String(dt).replace(' ', 'T')).getTime()) / 1000));
+  if (s < 60) return 'hace instantes';
+  const m = Math.floor(s / 60); if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60); if (h < 24) return `hace ${h} h`;
+  return `hace ${Math.floor(h / 24)} d`;
+}
+
+// Fecha corta legible.
+export function fmtFecha(dt) {
+  if (!dt) return '';
+  return new Date(String(dt).replace(' ', 'T'))
+    .toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 // Paleta NexaSalud
 export const COLORS = {
   navy:  '#0A1B3F',

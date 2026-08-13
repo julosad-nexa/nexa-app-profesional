@@ -7,13 +7,14 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { orienta } from '../../src/api/orienta';
 import { registerPush } from '../../src/lib/push';
-import { COLORS, DEFAULT_CATS, DEFAULT_TARIFA } from '../../src/config';
+import { COLORS, DEFAULT_CATS, DEFAULT_TARIFA, catLabel, haceTiempo } from '../../src/config';
 
 const HEARTBEAT_MS = 4 * 60 * 1000; // re-pinga cada 4 min (TTL Redis = 8 min)
 
 export default function Home() {
   const router = useRouter();
   const [disponible, setDisponible] = useState(false);
+  const [filtroCat, setFiltroCat] = useState('');
 
   useEffect(() => { registerPush(); }, []);
 
@@ -70,9 +71,14 @@ export default function Home() {
         options={{
           title: 'Orientaciones',
           headerRight: () => (
-            <TouchableOpacity onPress={() => router.push('/perfil')}>
-              <Text style={st.salir}>Ganancias</Text>
-            </TouchableOpacity>
+            <View style={st.headerActions}>
+              <TouchableOpacity onPress={() => router.push('/historial')}>
+                <Text style={st.headerBtn}>Historial</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/perfil')}>
+                <Text style={st.headerBtn}>Ganancias</Text>
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
@@ -98,9 +104,29 @@ export default function Home() {
         </View>
       )}
 
+      {/* Filtro por categoría (solo si atiende más de una) */}
+      {disponible && savedCats.length > 1 && (
+        <View style={st.filterRow}>
+          <FlatList
+            horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+            data={['', ...savedCats]}
+            keyExtractor={(x) => x || 'todas'}
+            renderItem={({ item }) => {
+              const on = filtroCat === item;
+              return (
+                <TouchableOpacity style={[st.chip, on && st.chipOn]} onPress={() => setFiltroCat(item)} activeOpacity={0.8}>
+                  <Text style={[st.chipT, on && st.chipTOn]}>{item ? catLabel(item) : 'Todas'}</Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      )}
+
       <FlatList
         contentContainerStyle={{ padding: 16 }}
-        data={feed.data?.feed || []}
+        data={(feed.data?.feed || []).filter((x) => !filtroCat || x.categoria === filtroCat)}
         keyExtractor={(x) => String(x.id)}
         refreshControl={<RefreshControl refreshing={feed.isFetching} onRefresh={feed.refetch} />}
         ListEmptyComponent={
@@ -110,7 +136,10 @@ export default function Home() {
         }
         renderItem={({ item }) => (
           <TouchableOpacity style={st.card} onPress={() => router.push(`/solicitud/${item.id}`)} activeOpacity={0.8}>
-            <View style={st.badge}><Text style={st.badgeT}>{item.categoria}</Text></View>
+            <View style={st.cardHead}>
+              <View style={st.badge}><Text style={st.badgeT}>{catLabel(item.categoria)}</Text></View>
+              <Text style={st.time}>{haceTiempo(item.created_at)}</Text>
+            </View>
             <Text style={st.txt} numberOfLines={2}>{item.texto}</Text>
             <Text style={st.cta}>Ver y aceptar →</Text>
           </TouchableOpacity>
@@ -123,6 +152,15 @@ export default function Home() {
 const st = StyleSheet.create({
   c: { flex: 1, backgroundColor: COLORS.bg },
   salir: { color: '#fff', fontWeight: '700' },
+  headerActions: { flexDirection: 'row', gap: 16 },
+  headerBtn: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  filterRow: { paddingTop: 12 },
+  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.line },
+  chipOn: { backgroundColor: 'rgba(0,166,156,0.12)', borderColor: COLORS.teal },
+  chipT: { color: COLORS.ink2, fontWeight: '700', fontSize: 13 },
+  chipTOn: { color: COLORS.tealD },
+  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  time: { color: COLORS.ink2, fontSize: 12 },
   avail: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: '#fff', margin: 16, marginBottom: 0, padding: 16, borderRadius: 14, borderWidth: 1.5,
