@@ -1,28 +1,29 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform, Modal, ScrollView,
+  KeyboardAvoidingView, Platform, Modal, ScrollView, Image,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { orienta } from '../../../src/api/orienta';
+import * as ImagePicker from 'expo-image-picker';
+import { orienta, adjuntoUrl } from '../../../src/api/orienta';
+import { useAuth } from '../../../src/store/auth';
 import { COLORS, PLANTILLAS, cop, catLabel } from '../../../src/config';
 
-// Campos del intake estructurado (contexto) que puede aportar el paciente.
 const INTAKE = [
-  ['edad', 'Edad'],
-  ['sexo', 'Sexo'],
-  ['evolucion', 'Evolución'],
-  ['alergias', 'Alergias'],
-  ['medicamentos', 'Medicamentos'],
-  ['embarazo', 'Embarazo'],
+  ['edad', 'Edad'], ['sexo', 'Sexo'], ['evolucion', 'Evolución'],
+  ['alergias', 'Alergias'], ['medicamentos', 'Medicamentos'], ['embarazo', 'Embarazo'],
 ];
 
 export default function SolicitudDetalle() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const headerHeight = useHeaderHeight();
+  const token = useAuth((s) => s.token);
   const [texto, setTexto] = useState('');
   const [plantillasOpen, setPlantillasOpen] = useState(false);
+  const [viewer, setViewer] = useState(null);
 
   const q = useQuery({
     queryKey: ['solicitud', id],
@@ -31,32 +32,33 @@ export default function SolicitudDetalle() {
   });
   const sol = q.data?.solicitud;
   const mensajes = q.data?.mensajes || [];
+  const imgHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
 
   const aceptar = useMutation({
     mutationFn: () => orienta.aceptar(id),
     onSuccess: () => q.refetch(),
     onError: (e) => Alert.alert('No se pudo aceptar', e.message),
   });
-
   const responder = useMutation({
     mutationFn: () => orienta.responder(id, texto.trim()),
     onSuccess: () => { setTexto(''); q.refetch(); },
     onError: (e) => Alert.alert('No se pudo enviar', e.message),
   });
-
+  const adjuntar = useMutation({
+    mutationFn: (asset) => orienta.enviarAdjunto(id, asset),
+    onSuccess: () => q.refetch(),
+    onError: (e) => Alert.alert('No se pudo enviar la imagen', e.message),
+  });
   const finalizar = useMutation({
     mutationFn: () => orienta.cerrar(id),
     onSuccess: (res) => {
       const liq = res?.liquidacion;
-      Alert.alert(
-        'Orientación finalizada',
+      Alert.alert('Orientación finalizada',
         liq ? `Ganaste ${cop(liq.neto_medico)} por esta orientación.` : 'La orientación fue cerrada.',
-        [{ text: 'Listo', onPress: () => router.back() }]
-      );
+        [{ text: 'Listo', onPress: () => router.back() }]);
     },
     onError: (e) => Alert.alert('No se pudo finalizar', e.message),
   });
-
   const derivar = useMutation({
     mutationFn: () => orienta.derivar(id),
     onSuccess: () => q.refetch(),
@@ -66,25 +68,40 @@ export default function SolicitudDetalle() {
   const confirmarFinalizar = () =>
     Alert.alert('Finalizar orientación',
       'Se cerrará la orientación y se registrará tu pago. El paciente ya no podrá escribir. ¿Continuar?',
-      [{ text: 'Cancelar', style: 'cancel' },
-       { text: 'Finalizar', style: 'destructive', onPress: () => finalizar.mutate() }]);
-
+      [{ text: 'Cancelar', style: 'cancel' }, { text: 'Finalizar', style: 'destructive', onPress: () => finalizar.mutate() }]);
   const confirmarDerivar = () =>
     Alert.alert('Derivar a urgencias',
       'Se enviará al paciente la recomendación de acudir a urgencias y quedará registrado en la auditoría. ¿Continuar?',
-      [{ text: 'Cancelar', style: 'cancel' },
-       { text: 'Derivar', style: 'destructive', onPress: () => derivar.mutate() }]);
+      [{ text: 'Cancelar', style: 'cancel' }, { text: 'Derivar', style: 'destructive', onPress: () => derivar.mutate() }]);
 
-  const usarPlantilla = (x) => {
-    setTexto((p) => (p ? `${p}\n${x}` : x));
-    setPlantillasOpen(false);
+  const elegirImagen = () =>
+    Alert.alert('Enviar imagen', 'Elige una fuente', [
+      { text: 'Cámara', onPress: () => lanzarPicker('camera') },
+      { text: 'Galería', onPress: () => lanzarPicker('gallery') },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+
+  const lanzarPicker = async (src) => {
+    try {
+      const perm = src === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) return Alert.alert('Permiso requerido', 'Habilita el acceso para enviar imágenes.');
+      const opts = { mediaTypes: ['images'], quality: 0.6 };
+      const r = src === 'camera'
+        ? await ImagePicker.launchCameraAsync(opts)
+        : await ImagePicker.launchImageLibraryAsync(opts);
+      if (!r.canceled && r.assets?.[0]) adjuntar.mutate(r.assets[0]);
+    } catch (e) { Alert.alert('Error', e.message); }
   };
+
+  const usarPlantilla = (x) => { setTexto((p) => (p ? `${p}\n${x}` : x)); setPlantillasOpen(false); };
 
   const puedeChatear = sol && ['asignada', 'respondida'].includes(sol.estado);
   const intake = (sol?.contexto && INTAKE.filter(([k]) => sol.contexto[k])) || [];
 
   return (
-    <KeyboardAvoidingView style={st.c} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+    <KeyboardAvoidingView style={st.c} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} keyboardVerticalOffset={headerHeight}>
       <Stack.Screen options={{ title: `Solicitud #${id}` }} />
 
       {q.isLoading || !sol ? (
@@ -97,7 +114,6 @@ export default function SolicitudDetalle() {
           </View>
           <Text style={st.pregunta}>{sol.texto}</Text>
 
-          {/* Intake estructurado del paciente (sin HC) */}
           {intake.length > 0 && (
             <View style={st.intake}>
               {intake.map(([k, label]) => (
@@ -124,6 +140,17 @@ export default function SolicitudDetalle() {
                 return <View style={st.sysWrap}><Text style={st.sysT}>{item.texto}</Text></View>;
               }
               const mine = item.emisor === 'medico';
+              if (item.tipo === 'imagen' && item.adjunto) {
+                const uri = adjuntoUrl(id, item.adjunto);
+                return (
+                  <TouchableOpacity
+                    style={[st.imgBubble, mine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }]}
+                    onPress={() => setViewer(uri)} activeOpacity={0.9}
+                  >
+                    <Image source={{ uri, headers: imgHeaders }} style={st.thumb} />
+                  </TouchableOpacity>
+                );
+              }
               return (
                 <View style={[st.msg, mine ? st.mine : st.theirs]}>
                   <Text style={mine ? st.msgTmine : st.msgT}>{item.texto}</Text>
@@ -142,8 +169,9 @@ export default function SolicitudDetalle() {
             <>
               <Text style={st.disc}>Teleorientación: orientación general, sin diagnóstico ni fórmula. Ante señales de alarma, deriva a urgencias.</Text>
               <View style={st.inputRow}>
-                <TouchableOpacity style={st.tools} onPress={() => setPlantillasOpen(true)}>
-                  <Text style={st.toolsT}>＋</Text>
+                <TouchableOpacity style={st.tool} onPress={() => setPlantillasOpen(true)}><Text style={st.toolT}>＋</Text></TouchableOpacity>
+                <TouchableOpacity style={st.tool} onPress={elegirImagen} disabled={adjuntar.isPending}>
+                  {adjuntar.isPending ? <ActivityIndicator color={COLORS.tealD} /> : <Text style={st.toolT}>📷</Text>}
                 </TouchableOpacity>
                 <TextInput
                   style={st.in} placeholder="Escribe tu orientación…" placeholderTextColor="#94A3B8"
@@ -172,7 +200,7 @@ export default function SolicitudDetalle() {
         </>
       )}
 
-      {/* Plantillas de respuesta rápida */}
+      {/* Plantillas */}
       <Modal visible={plantillasOpen} transparent animationType="slide" onRequestClose={() => setPlantillasOpen(false)}>
         <TouchableOpacity style={st.modalBg} activeOpacity={1} onPress={() => setPlantillasOpen(false)}>
           <View style={st.sheet}>
@@ -186,6 +214,13 @@ export default function SolicitudDetalle() {
               ))}
             </ScrollView>
           </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Visor de imagen a pantalla completa */}
+      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
+        <TouchableOpacity style={st.viewerBg} activeOpacity={1} onPress={() => setViewer(null)}>
+          {viewer && <Image source={{ uri: viewer, headers: imgHeaders }} style={st.viewerImg} resizeMode="contain" />}
         </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
@@ -209,16 +244,18 @@ const st = StyleSheet.create({
   theirs: { alignSelf: 'flex-start', backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.line, borderBottomLeftRadius: 4 },
   msgT: { color: COLORS.ink, fontSize: 15 },
   msgTmine: { color: '#fff', fontSize: 15 },
+  imgBubble: { marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
+  thumb: { width: 200, height: 200, borderRadius: 14, backgroundColor: '#E2E8F0' },
   sysWrap: { alignSelf: 'center', maxWidth: '92%', backgroundColor: '#FDECEC', borderWidth: 1, borderColor: '#E5534B', borderRadius: 12, padding: 10, marginBottom: 10 },
   sysT: { color: '#B4231B', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   accept: { backgroundColor: COLORS.teal, margin: 16, padding: 16, borderRadius: 14, alignItems: 'center' },
   acceptT: { color: '#fff', fontWeight: '800', fontSize: 16 },
   disc: { fontSize: 11, color: COLORS.ink2, paddingHorizontal: 16, paddingBottom: 6 },
-  inputRow: { flexDirection: 'row', padding: 12, gap: 8, backgroundColor: '#fff', borderTopWidth: 1, borderColor: COLORS.line, alignItems: 'flex-end' },
-  tools: { width: 42, height: 42, borderRadius: 12, backgroundColor: COLORS.bg, alignItems: 'center', justifyContent: 'center' },
-  toolsT: { fontSize: 22, color: COLORS.tealD, fontWeight: '800', marginTop: -2 },
+  inputRow: { flexDirection: 'row', padding: 12, gap: 6, backgroundColor: '#fff', borderTopWidth: 1, borderColor: COLORS.line, alignItems: 'flex-end' },
+  tool: { width: 42, height: 42, borderRadius: 12, backgroundColor: COLORS.bg, alignItems: 'center', justifyContent: 'center' },
+  toolT: { fontSize: 20, color: COLORS.tealD, fontWeight: '800' },
   in: { flex: 1, backgroundColor: COLORS.bg, borderRadius: 12, padding: 12, fontSize: 15, maxHeight: 100 },
-  send: { backgroundColor: COLORS.navy, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12 },
+  send: { backgroundColor: COLORS.navy, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12 },
   sendT: { color: '#fff', fontWeight: '800' },
   actionsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 12, paddingBottom: 12 },
   derivar: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5534B' },
@@ -232,4 +269,6 @@ const st = StyleSheet.create({
   plantilla: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.line },
   plantillaT: { fontSize: 14, fontWeight: '800', color: COLORS.tealD },
   plantillaX: { fontSize: 13, color: COLORS.ink2, marginTop: 2 },
+  viewerBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
+  viewerImg: { width: '100%', height: '80%' },
 });

@@ -1,10 +1,13 @@
-import { request } from './client';
+import { request, upload } from './client';
 import { API } from '../config';
 
 const O = (path, opts) => request(API.orienta, path, opts);
 
 // Precios/planes públicos (los sirve WP desde la config del admin).
 export const configPublica = () => request(API.wp, '/orienta/config');
+
+// URL autenticada de un adjunto (se usa con <Image source={{uri, headers}}>).
+export const adjuntoUrl = (id, name) => `${API.orienta}/orienta/solicitudes/${id}/adjunto/${name}`;
 
 // Endpoints del microservicio nexa-orienta consumidos por el médico.
 export const orienta = {
@@ -37,6 +40,14 @@ export const orienta = {
 
   derivar: (id, motivo = '') =>
     O(`/orienta/solicitudes/${id}/derivar`, { method: 'POST', body: { motivo } }),
+
+  enviarAdjunto: (id, asset) => {
+    const type = asset.mimeType || 'image/jpeg';
+    const ext = (type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+    const form = new FormData();
+    form.append('file', { uri: asset.uri, name: asset.fileName || `foto.${ext}`, type });
+    return upload(API.orienta, `/orienta/solicitudes/${id}/adjunto`, form);
+  },
 
   registrarPush: (token) =>
     O('/orienta/push/registrar', { method: 'POST', body: { token } }),

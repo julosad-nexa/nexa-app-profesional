@@ -58,3 +58,34 @@ export async function request(base, path, { method = 'GET', body, auth = true } 
   }
   return data;
 }
+
+// Subida multipart (FormData). No fija Content-Type (fetch pone el boundary).
+// Mismo manejo de 401 → refresh → reintento que request().
+export async function upload(base, path, formData) {
+  let token = useAuth.getState().token;
+  const send = (tok) =>
+    fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+      body: formData,
+    });
+
+  let res = await send(token);
+  if (res.status === 401) {
+    try {
+      if (!refreshing) refreshing = useAuth.getState().refresh().finally(() => { refreshing = null; });
+      token = await refreshing;
+      res = await send(token);
+    } catch {
+      await useAuth.getState().logout();
+      const e = new Error('Sesión expirada'); e.status = 401; throw e;
+    }
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const e = new Error(data?.error || `Error ${res.status}`);
+    e.status = res.status;
+    throw e;
+  }
+  return data;
+}
