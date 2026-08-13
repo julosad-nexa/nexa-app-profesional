@@ -24,6 +24,7 @@ export default function SolicitudDetalle() {
   const [texto, setTexto] = useState('');
   const [plantillasOpen, setPlantillasOpen] = useState(false);
   const [viewer, setViewer] = useState(null);
+  const [pendingImg, setPendingImg] = useState(null); // imagen elegida, en espera de confirmación
 
   const q = useQuery({
     queryKey: ['solicitud', id],
@@ -46,7 +47,7 @@ export default function SolicitudDetalle() {
   });
   const adjuntar = useMutation({
     mutationFn: (asset) => orienta.enviarAdjunto(id, asset),
-    onSuccess: () => q.refetch(),
+    onSuccess: () => { setPendingImg(null); q.refetch(); },
     onError: (e) => Alert.alert('No se pudo enviar la imagen', e.message),
   });
   const finalizar = useMutation({
@@ -91,7 +92,7 @@ export default function SolicitudDetalle() {
       const r = src === 'camera'
         ? await ImagePicker.launchCameraAsync(opts)
         : await ImagePicker.launchImageLibraryAsync(opts);
-      if (!r.canceled && r.assets?.[0]) adjuntar.mutate(r.assets[0]);
+      if (!r.canceled && r.assets?.[0]) setPendingImg(r.assets[0]); // muestra preview, no envía aún
     } catch (e) { Alert.alert('Error', e.message); }
   };
 
@@ -101,7 +102,11 @@ export default function SolicitudDetalle() {
   const intake = (sol?.contexto && INTAKE.filter(([k]) => sol.contexto[k])) || [];
 
   return (
-    <KeyboardAvoidingView style={st.c} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} keyboardVerticalOffset={headerHeight}>
+    <KeyboardAvoidingView
+      style={st.c}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+    >
       <Stack.Screen options={{ title: `Solicitud #${id}` }} />
 
       {q.isLoading || !sol ? (
@@ -143,12 +148,9 @@ export default function SolicitudDetalle() {
               if (item.tipo === 'imagen' && item.adjunto) {
                 const uri = adjuntoUrl(id, item.adjunto);
                 return (
-                  <TouchableOpacity
-                    style={[st.imgBubble, mine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }]}
-                    onPress={() => setViewer(uri)} activeOpacity={0.9}
-                  >
-                    <Image source={{ uri, headers: imgHeaders }} style={st.thumb} />
-                  </TouchableOpacity>
+                  <View style={{ alignItems: mine ? 'flex-end' : 'flex-start' }}>
+                    <ChatImage uri={uri} headers={imgHeaders} onPress={() => setViewer(uri)} />
+                  </View>
                 );
               }
               return (
@@ -217,6 +219,24 @@ export default function SolicitudDetalle() {
         </TouchableOpacity>
       </Modal>
 
+      {/* Preview + confirmación antes de enviar la imagen */}
+      <Modal visible={!!pendingImg} transparent animationType="slide" onRequestClose={() => setPendingImg(null)}>
+        <View style={st.previewBg}>
+          <View style={st.previewCard}>
+            <Text style={st.previewTitle}>Enviar imagen</Text>
+            {pendingImg && <Image source={{ uri: pendingImg.uri }} style={st.previewImg} resizeMode="contain" />}
+            <View style={st.previewActions}>
+              <TouchableOpacity style={st.previewCancel} onPress={() => setPendingImg(null)} disabled={adjuntar.isPending}>
+                <Text style={st.previewCancelT}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={st.previewSend} onPress={() => adjuntar.mutate(pendingImg)} disabled={adjuntar.isPending}>
+                {adjuntar.isPending ? <ActivityIndicator color="#fff" /> : <Text style={st.previewSendT}>Enviar</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Visor de imagen a pantalla completa */}
       <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
         <TouchableOpacity style={st.viewerBg} activeOpacity={1} onPress={() => setViewer(null)}>
@@ -224,6 +244,20 @@ export default function SolicitudDetalle() {
         </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
+  );
+}
+
+// Miniatura de imagen del chat con estado de error (evita el recuadro gris mudo).
+function ChatImage({ uri, headers, onPress }) {
+  const [err, setErr] = useState(false);
+  return (
+    <TouchableOpacity style={st.imgBubble} onPress={onPress} activeOpacity={0.9}>
+      {err ? (
+        <View style={[st.thumb, st.thumbErr]}><Text style={st.thumbErrT}>No se pudo cargar la imagen</Text></View>
+      ) : (
+        <Image source={{ uri, headers }} style={st.thumb} onError={() => setErr(true)} />
+      )}
+    </TouchableOpacity>
   );
 }
 
@@ -246,6 +280,8 @@ const st = StyleSheet.create({
   msgTmine: { color: '#fff', fontSize: 15 },
   imgBubble: { marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
   thumb: { width: 200, height: 200, borderRadius: 14, backgroundColor: '#E2E8F0' },
+  thumbErr: { alignItems: 'center', justifyContent: 'center', padding: 10 },
+  thumbErrT: { color: COLORS.ink2, fontSize: 12, fontWeight: '700', textAlign: 'center' },
   sysWrap: { alignSelf: 'center', maxWidth: '92%', backgroundColor: '#FDECEC', borderWidth: 1, borderColor: '#E5534B', borderRadius: 12, padding: 10, marginBottom: 10 },
   sysT: { color: '#B4231B', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   accept: { backgroundColor: COLORS.teal, margin: 16, padding: 16, borderRadius: 14, alignItems: 'center' },
@@ -271,4 +307,13 @@ const st = StyleSheet.create({
   plantillaX: { fontSize: 13, color: COLORS.ink2, marginTop: 2 },
   viewerBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
   viewerImg: { width: '100%', height: '80%' },
+  previewBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
+  previewCard: { backgroundColor: '#fff', borderRadius: 18, padding: 16 },
+  previewTitle: { fontSize: 16, fontWeight: '800', color: COLORS.ink, marginBottom: 12 },
+  previewImg: { width: '100%', height: 320, borderRadius: 12, backgroundColor: '#E2E8F0' },
+  previewActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  previewCancel: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.line },
+  previewCancelT: { color: COLORS.ink2, fontWeight: '800' },
+  previewSend: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 12, backgroundColor: COLORS.teal },
+  previewSendT: { color: '#fff', fontWeight: '800' },
 });
