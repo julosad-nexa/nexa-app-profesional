@@ -4,9 +4,9 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
 import { orienta } from '../../src/api/orienta';
 import { registerPush } from '../../src/lib/push';
+import { prepararAlertas, alertaNuevaSolicitud } from '../../src/lib/alerta';
 import { COLORS, DEFAULT_CATS, DEFAULT_TARIFA, catLabel, haceTiempo } from '../../src/config';
 
 const HEARTBEAT_MS = 4 * 60 * 1000; // re-pinga cada 4 min (TTL Redis = 8 min)
@@ -16,7 +16,7 @@ export default function Home() {
   const [disponible, setDisponible] = useState(false);
   const [filtroCat, setFiltroCat] = useState('');
 
-  useEffect(() => { registerPush(); }, []);
+  useEffect(() => { registerPush(); prepararAlertas(); }, []);
 
   // Perfil del médico: define su tarifa/categorías y su estado de disponibilidad real.
   const perfil = useQuery({ queryKey: ['perfil'], queryFn: orienta.perfil });
@@ -59,8 +59,8 @@ export default function Home() {
     const items = feed.data?.feed || [];
     const ids = new Set(items.map((x) => x.id));
     if (knownIdsRef.current) {
-      const hayNueva = items.some((x) => !knownIdsRef.current.has(x.id));
-      if (hayNueva) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      const nuevos = items.filter((x) => !knownIdsRef.current.has(x.id)).length;
+      if (nuevos > 0) alertaNuevaSolicitud(nuevos);
     }
     knownIdsRef.current = ids;
   }, [feed.data, disponible]);

@@ -4,15 +4,8 @@ import Constants from 'expo-constants';
 import { orienta } from '../api/orienta';
 
 // Expo Go (SDK 53+) no soporta push remoto — solo un development build.
+// El handler de notificaciones (foreground) vive en src/lib/alerta.js.
 const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
 
 // Pide permiso, obtiene el Expo push token y lo registra en nexa-orienta.
 export async function registerPush() {
