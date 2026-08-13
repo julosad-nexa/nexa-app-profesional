@@ -6,8 +6,10 @@ const O = (path, opts) => request(API.orienta, path, opts);
 // Precios/planes públicos (los sirve WP desde la config del admin).
 export const configPublica = () => request(API.wp, '/orienta/config');
 
-// URL autenticada de un adjunto (se usa con <Image source={{uri, headers}}>).
-export const adjuntoUrl = (id, name) => `${API.orienta}/orienta/solicitudes/${id}/adjunto/${name}`;
+// URL autenticada de un adjunto. Lleva el token por query (?t=) porque <Image> de RN
+// no envía headers de forma fiable en Android.
+export const adjuntoUrl = (id, name, token) =>
+  `${API.orienta}/orienta/solicitudes/${id}/adjunto/${name}${token ? `?t=${encodeURIComponent(token)}` : ''}`;
 
 // Endpoints del microservicio nexa-orienta consumidos por el médico.
 export const orienta = {

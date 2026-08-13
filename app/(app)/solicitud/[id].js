@@ -35,7 +35,6 @@ export default function SolicitudDetalle() {
   });
   const sol = q.data?.solicitud;
   const mensajes = q.data?.mensajes || [];
-  const imgHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
 
   const aceptar = useMutation({
     mutationFn: () => orienta.aceptar(id),
@@ -148,10 +147,10 @@ export default function SolicitudDetalle() {
               }
               const mine = item.emisor === 'medico';
               if (item.tipo === 'imagen' && item.adjunto) {
-                const uri = adjuntoUrl(id, item.adjunto);
+                const uri = adjuntoUrl(id, item.adjunto, token);
                 return (
                   <View style={{ alignItems: mine ? 'flex-end' : 'flex-start' }}>
-                    <ChatImage uri={uri} headers={imgHeaders} onPress={() => setViewer(uri)} />
+                    <ChatImage uri={uri} onPress={() => setViewer(uri)} />
                   </View>
                 );
               }
@@ -242,7 +241,7 @@ export default function SolicitudDetalle() {
       {/* Visor de imagen a pantalla completa */}
       <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
         <TouchableOpacity style={st.viewerBg} activeOpacity={1} onPress={() => setViewer(null)}>
-          {viewer && <Image source={{ uri: viewer, headers: imgHeaders }} style={st.viewerImg} resizeMode="contain" />}
+          {viewer && <Image source={{ uri: viewer }} style={st.viewerImg} resizeMode="contain" />}
         </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
@@ -250,14 +249,14 @@ export default function SolicitudDetalle() {
 }
 
 // Miniatura de imagen del chat con estado de error (evita el recuadro gris mudo).
-function ChatImage({ uri, headers, onPress }) {
+function ChatImage({ uri, onPress }) {
   const [err, setErr] = useState(false);
   return (
     <TouchableOpacity style={st.imgBubble} onPress={onPress} activeOpacity={0.9}>
       {err ? (
         <View style={[st.thumb, st.thumbErr]}><Text style={st.thumbErrT}>No se pudo cargar la imagen</Text></View>
       ) : (
-        <Image source={{ uri, headers }} style={st.thumb} onError={() => setErr(true)} />
+        <Image source={{ uri }} style={st.thumb} onError={() => setErr(true)} />
       )}
     </TouchableOpacity>
   );
