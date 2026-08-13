@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { orienta, adjuntoUrl } from '../../../src/api/orienta';
@@ -20,6 +21,7 @@ export default function SolicitudDetalle() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const headerHeight = useHeaderHeight();
+  const insets = useSafeAreaInsets();
   const token = useAuth((s) => s.token);
   const [texto, setTexto] = useState('');
   const [plantillasOpen, setPlantillasOpen] = useState(false);
@@ -105,7 +107,7 @@ export default function SolicitudDetalle() {
     <KeyboardAvoidingView
       style={st.c}
       behavior="padding"
-      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : insets.bottom}
     >
       <Stack.Screen options={{ title: `Solicitud #${id}` }} />
 
