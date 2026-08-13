@@ -16,6 +16,15 @@ export const CATEGORIAS = [
 export const DEFAULT_CATS = ['general', 'pediatria'];
 export const DEFAULT_TARIFA = 8000;
 
+// Respuestas rápidas para el médico (MVP; luego configurables desde el admin).
+export const PLANTILLAS = [
+  { t: 'Hidratación y reposo', x: 'Te recomiendo hidratación abundante y reposo. Si en 48–72 h no mejoras, consulta presencialmente.' },
+  { t: 'Signos de alarma', x: 'Vigila señales de alarma (fiebre alta persistente, dificultad para respirar, dolor intenso). Ante cualquiera, acude a urgencias.' },
+  { t: 'Fiebre', x: 'Puedes usar medios físicos y el antipirético que ya toleres según indicación previa. Si la fiebre supera 39°C o dura más de 3 días, consulta.' },
+  { t: 'No es diagnóstico', x: 'Recuerda que esto es orientación general, no reemplaza una consulta médica presencial ni un diagnóstico formal.' },
+  { t: 'Cierre', x: '¿Tienes alguna otra duda sobre esta orientación? Si no, con gusto la finalizo.' },
+];
+
 // Etiqueta legible de una categoría por su id.
 export const catLabel = (id) => CATEGORIAS.find((c) => c.id === id)?.label || id;
 

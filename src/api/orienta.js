@@ -35,6 +35,9 @@ export const orienta = {
   cerrar: (id) =>
     O(`/orienta/solicitudes/${id}/cerrar`, { method: 'POST', body: {} }),
 
+  derivar: (id, motivo = '') =>
+    O(`/orienta/solicitudes/${id}/derivar`, { method: 'POST', body: { motivo } }),
+
   registrarPush: (token) =>
     O('/orienta/push/registrar', { method: 'POST', body: { token } }),
 };
