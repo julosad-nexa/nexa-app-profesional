@@ -6,7 +6,7 @@ import { Stack } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { orienta, configPublica } from '../../src/api/orienta';
 import { useAuth } from '../../src/store/auth';
-import { COLORS, cop } from '../../src/config';
+import { COLORS, cop, fmtFecha, catLabel } from '../../src/config';
 
 export default function Perfil() {
   const logout = useAuth((s) => s.logout);
@@ -17,6 +17,7 @@ export default function Perfil() {
 
   const q = useQuery({ queryKey: ['perfil'], queryFn: orienta.perfil });
   const cfg = useQuery({ queryKey: ['config-publica'], queryFn: configPublica });
+  const pay = useQuery({ queryKey: ['payouts'], queryFn: orienta.payouts });
 
   // Sembrar categorías y datos de verificación del médico una sola vez.
   useEffect(() => {
@@ -142,6 +143,31 @@ export default function Perfil() {
             {guardar.isPending ? <ActivityIndicator color="#fff" /> : <Text style={st.saveT}>Guardar cambios</Text>}
           </TouchableOpacity>
 
+          {/* Historial de pagos */}
+          <Text style={st.section}>Historial de pagos</Text>
+          {pay.isLoading ? (
+            <ActivityIndicator style={{ marginVertical: 16 }} color={COLORS.teal} />
+          ) : (pay.data?.payouts || []).length === 0 ? (
+            <Text style={st.hint}>Aún no tienes pagos. Aparecerán al cerrarse cada orientación.</Text>
+          ) : (
+            <View style={st.payList}>
+              {pay.data.payouts.map((p, i) => (
+                <View key={i} style={st.payRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={st.payCat}>{catLabel(p.categoria)}</Text>
+                    <Text style={st.payDate}>{fmtFecha(p.ts)}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={st.payNeto}>{cop(p.neto_medico)}</Text>
+                    <Text style={[st.payEstado, p.estado_payout === 'liquidado' ? st.payPagado : st.payPend]}>
+                      {p.estado_payout === 'liquidado' ? 'Pagado' : 'Por cobrar'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
           <TouchableOpacity style={st.logout} onPress={logout} activeOpacity={0.7}>
             <Text style={st.logoutT}>Cerrar sesión</Text>
           </TouchableOpacity>
@@ -186,6 +212,14 @@ const st = StyleSheet.create({
   catPayOn: { color: COLORS.tealD },
   save: { backgroundColor: COLORS.teal, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 24 },
   saveT: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  payList: { gap: 8, marginTop: 4 },
+  payRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: COLORS.line, padding: 14 },
+  payCat: { color: COLORS.ink, fontSize: 14, fontWeight: '700' },
+  payDate: { color: COLORS.ink2, fontSize: 12, marginTop: 2 },
+  payNeto: { color: COLORS.ink, fontSize: 15, fontWeight: '800' },
+  payEstado: { fontSize: 11, fontWeight: '800', marginTop: 2 },
+  payPagado: { color: '#0E7C66' },
+  payPend: { color: '#92400E' },
   logout: { padding: 16, alignItems: 'center', marginTop: 8 },
   logoutT: { color: '#B4231B', fontWeight: '700' },
 });

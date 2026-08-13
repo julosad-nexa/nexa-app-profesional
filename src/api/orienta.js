@@ -20,6 +20,8 @@ export const orienta = {
 
   perfil: () => O('/orienta/medico/perfil'),
 
+  payouts: () => O('/orienta/medico/payouts'),
+
   historial: (params = {}) => {
     const qs = new URLSearchParams(
       Object.entries(params).filter(([, v]) => v != null && v !== '')
