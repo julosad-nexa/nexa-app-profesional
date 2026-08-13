@@ -50,7 +50,7 @@ export default function Perfil() {
   };
 
   const g = q.data?.ganancias;
-  const rating = q.data?.perfil?.rating;
+  const cal = q.data?.calificaciones;
   const categorias = cfg.data?.categorias || []; // catálogo con payout desde la config
   const v = q.data?.verificacion;
   const verificado = v?.verificado;
@@ -75,7 +75,11 @@ export default function Perfil() {
           <View style={st.row}>
             <View style={st.metric}><Text style={st.mLabel}>Por cobrar</Text><Text style={st.mValue}>{cop(g?.pendiente)}</Text></View>
             <View style={st.metric}><Text style={st.mLabel}>Pagado</Text><Text style={st.mValue}>{cop(g?.liquidado)}</Text></View>
-            <View style={st.metric}><Text style={st.mLabel}>Calificación</Text><Text style={st.mValue}>{rating != null ? `${rating}★` : '—'}</Text></View>
+            <View style={st.metric}>
+              <Text style={st.mLabel}>Calificación</Text>
+              <Text style={st.mValue}>{cal?.promedio != null ? `${cal.promedio}★` : '—'}</Text>
+              {cal?.total > 0 && <Text style={st.mSub}>{cal.total} {cal.total === 1 ? 'reseña' : 'reseñas'}</Text>}
+            </View>
           </View>
 
           {/* Verificación profesional (ReTHUS) */}
@@ -187,6 +191,7 @@ const st = StyleSheet.create({
   metric: { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: COLORS.line },
   mLabel: { color: COLORS.ink2, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
   mValue: { color: COLORS.ink, fontSize: 18, fontWeight: '800', marginTop: 6 },
+  mSub: { color: COLORS.ink2, fontSize: 10, marginTop: 1 },
   section: { color: COLORS.ink, fontSize: 16, fontWeight: '800', marginTop: 24 },
   hint: { color: COLORS.ink2, fontSize: 12, marginTop: 3, marginBottom: 12, lineHeight: 17 },
   verOk: { backgroundColor: 'rgba(0,166,156,0.10)', borderWidth: 1, borderColor: COLORS.teal, borderRadius: 14, padding: 14, marginTop: 10 },
