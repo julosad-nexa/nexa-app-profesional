@@ -5,6 +5,7 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { orienta } from '../../src/api/orienta';
+import { useAuth } from '../../src/store/auth';
 import { registerPush } from '../../src/lib/push';
 import { prepararAlertas, alertaNuevaSolicitud } from '../../src/lib/alerta';
 import { COLORS, DEFAULT_CATS, DEFAULT_TARIFA, catLabel, haceTiempo } from '../../src/config';
@@ -13,8 +14,15 @@ const HEARTBEAT_MS = 4 * 60 * 1000; // re-pinga cada 4 min (TTL Redis = 8 min)
 
 export default function Home() {
   const router = useRouter();
+  const logout = useAuth((s) => s.logout);
   const [disponible, setDisponible] = useState(false);
   const [filtroCat, setFiltroCat] = useState('');
+
+  const confirmarSalir = () =>
+    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => logout() },
+    ]);
 
   useEffect(() => { registerPush(); prepararAlertas(); }, []);
 
@@ -77,6 +85,9 @@ export default function Home() {
               </TouchableOpacity>
               <TouchableOpacity onPress={() => router.push('/perfil')}>
                 <Text style={st.headerBtn}>Ganancias</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmarSalir}>
+                <Text style={st.headerSalir}>Salir</Text>
               </TouchableOpacity>
             </View>
           ),
@@ -152,8 +163,9 @@ export default function Home() {
 const st = StyleSheet.create({
   c: { flex: 1, backgroundColor: COLORS.bg },
   salir: { color: '#fff', fontWeight: '700' },
-  headerActions: { flexDirection: 'row', gap: 16 },
+  headerActions: { flexDirection: 'row', gap: 14, alignItems: 'center' },
   headerBtn: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  headerSalir: { color: '#FCA5A5', fontWeight: '800', fontSize: 13 },
   filterRow: { paddingTop: 12 },
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.line },
   chipOn: { backgroundColor: 'rgba(0,166,156,0.12)', borderColor: COLORS.teal },

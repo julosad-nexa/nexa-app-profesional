@@ -11,11 +11,14 @@ const queryClient = new QueryClient({
 });
 
 function AuthGate({ children }) {
-  const { token, loading, hydrate } = useAuth();
+  // Selectores explícitos: garantizan re-render cuando cambia el token (logout / 401).
+  const token = useAuth((s) => s.token);
+  const loading = useAuth((s) => s.loading);
+  const hydrate = useAuth((s) => s.hydrate);
   const segments = useSegments();
   const router = useRouter();
 
-  useEffect(() => { hydrate(); }, []);
+  useEffect(() => { hydrate(); }, [hydrate]);
 
   useEffect(() => {
     if (loading) return;
