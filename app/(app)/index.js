@@ -30,6 +30,14 @@ export default function Home() {
   // Categorías y payouts vienen del backend, no del bundle.
   const { catLabel, payoutDe } = useCatalogo();
 
+  // Reloj propio: el feed se refresca cada 8 s, pero la cuenta regresiva tiene que
+  // bajar cada segundo o parece congelada justo cuando más importa.
+  const [ahora, setAhora] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   // Perfil del médico: define su tarifa/categorías y su estado de disponibilidad real.
   const perfil = useQuery({ queryKey: ['perfil'], queryFn: orienta.perfil });
   useEffect(() => {
@@ -152,22 +160,56 @@ export default function Home() {
             {disponible ? 'Sin solicitudes por ahora…' : 'Ponte Disponible para recibir solicitudes.'}
           </Text>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity style={st.card} onPress={() => router.push(`/solicitud/${item.id}`)} activeOpacity={0.8}>
-            <View style={st.cardHead}>
-              <View style={st.badge}><Text style={st.badgeT}>{catLabel(item.categoria)}</Text></View>
-              <Text style={st.time}>{haceTiempo(item.created_at)}</Text>
-            </View>
-            <Text style={st.txt} numberOfLines={2}>{item.texto}</Text>
-            <Text style={st.cta}>Ver y aceptar →</Text>
-          </TouchableOpacity>
-        )}
+        renderItem={({ item }) => {
+          const q = restanteSla(item.sla_at, ahora);
+          return (
+            <TouchableOpacity style={st.card} onPress={() => router.push(`/solicitud/${item.id}`)} activeOpacity={0.8}>
+              <View style={st.cardHead}>
+                <View style={st.badge}><Text style={st.badgeT}>{catLabel(item.categoria)}</Text></View>
+                <Text style={st.time}>{haceTiempo(item.created_at)}</Text>
+              </View>
+              <Text style={st.txt} numberOfLines={2}>{item.texto}</Text>
+              <View style={st.cardFoot}>
+                <Text style={st.cta}>Ver y aceptar →</Text>
+                {q && (
+                  <Text style={[st.sla, q.urgente && st.slaUrgente]}>{q.etiqueta}</Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        }}
       />
     </View>
   );
 }
 
+/**
+ * Lo que le queda a una solicitud antes de expirar.
+ *
+ * El SLA son 3 minutos: sin esto el médico abre una solicitud que va a
+ * desaparecerle en la cara, o deja pasar la que todavía podía tomar. Por debajo
+ * de 30 segundos se marca en rojo, que es cuando ya no conviene abrirla.
+ *
+ * Devuelve null si no hay sla_at — versiones viejas del backend no lo mandaban y
+ * la tarjeta debe seguir pintándose igual.
+ */
+function restanteSla(slaAt, ahora) {
+  if (!slaAt) return null;
+  const fin = new Date(String(slaAt).replace(' ', 'T')).getTime();
+  if (!fin) return null;
+
+  const seg = Math.round((fin - ahora) / 1000);
+  if (seg <= 0) return { etiqueta: 'expirando…', urgente: true };
+  if (seg < 60) return { etiqueta: `${seg} s`, urgente: seg <= 30 };
+
+  const m = Math.floor(seg / 60);
+  return { etiqueta: `${m}:${String(seg % 60).padStart(2, '0')}`, urgente: false };
+}
+
 const st = StyleSheet.create({
+  cardFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sla: { fontSize: 12, fontWeight: '700', color: COLORS.ink2, fontVariant: ['tabular-nums'] },
+  slaUrgente: { color: '#C2410C' },
   c: { flex: 1, backgroundColor: COLORS.bg },
   salir: { color: '#fff', fontWeight: '700' },
   headerActions: { flexDirection: 'row', gap: 14, alignItems: 'center' },
