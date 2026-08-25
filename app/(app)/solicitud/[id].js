@@ -10,7 +10,8 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { orienta, adjuntoUrl } from '../../../src/api/orienta';
 import { useAuth } from '../../../src/store/auth';
-import { COLORS, PLANTILLAS, cop, catLabel } from '../../../src/config';
+import { COLORS, PLANTILLAS, cop } from '../../../src/config';
+import { useCatalogo } from '../../../src/lib/catalogo';
 
 const INTAKE = [
   ['edad', 'Edad'], ['sexo', 'Sexo'], ['evolucion', 'Evolución'],
@@ -18,6 +19,7 @@ const INTAKE = [
 ];
 
 export default function SolicitudDetalle() {
+  const { catLabel } = useCatalogo();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const headerHeight = useHeaderHeight();

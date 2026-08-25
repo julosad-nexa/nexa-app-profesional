@@ -6,9 +6,11 @@ import { Stack } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { orienta, configPublica } from '../../src/api/orienta';
 import { useAuth } from '../../src/store/auth';
-import { COLORS, cop, fmtFecha, catLabel } from '../../src/config';
+import { COLORS, cop, fmtFecha } from '../../src/config';
+import { useCatalogo } from '../../src/lib/catalogo';
 
 export default function Perfil() {
+  const { catLabel } = useCatalogo();
   const logout = useAuth((s) => s.logout);
   const [cats, setCats] = useState([]);
   const [dirty, setDirty] = useState(false);

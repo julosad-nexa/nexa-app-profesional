@@ -8,7 +8,8 @@ import { orienta } from '../../src/api/orienta';
 import { useAuth } from '../../src/store/auth';
 import { registerPush } from '../../src/lib/push';
 import { prepararAlertas, alertaNuevaSolicitud } from '../../src/lib/alerta';
-import { COLORS, DEFAULT_CATS, DEFAULT_TARIFA, catLabel, haceTiempo } from '../../src/config';
+import { COLORS, DEFAULT_CATS, haceTiempo } from '../../src/config';
+import { useCatalogo } from '../../src/lib/catalogo';
 
 const HEARTBEAT_MS = 4 * 60 * 1000; // re-pinga cada 4 min (TTL Redis = 8 min)
 
@@ -26,6 +27,9 @@ export default function Home() {
 
   useEffect(() => { registerPush(); prepararAlertas(); }, []);
 
+  // Categorías y payouts vienen del backend, no del bundle.
+  const { catLabel, payoutDe } = useCatalogo();
+
   // Perfil del médico: define su tarifa/categorías y su estado de disponibilidad real.
   const perfil = useQuery({ queryKey: ['perfil'], queryFn: orienta.perfil });
   useEffect(() => {
@@ -33,7 +37,10 @@ export default function Home() {
   }, [perfil.data?.disponible]);
 
   const savedCats = perfil.data?.perfil?.categorias?.length ? perfil.data.perfil.categorias : DEFAULT_CATS;
-  const savedTarifa = perfil.data?.perfil?.tarifa || DEFAULT_TARIFA;
+  // Si el médico aún no fijó tarifa, se usa el payout real de su primera categoría.
+  // Antes había un 8.000 escrito en el bundle que no correspondía a nada: el payout
+  // de medicina general son 17.500 y el del resto 35.000.
+  const savedTarifa = perfil.data?.perfil?.tarifa || payoutDe(savedCats[0]) || 0;
 
   const feed = useQuery({
     queryKey: ['feed'],

@@ -28,7 +28,8 @@
       "expo-font"
     ],
     "extra": {
-      "router": {}
+      "router": {},
+      "nexaEnv": "qa"
     }
   }
 }

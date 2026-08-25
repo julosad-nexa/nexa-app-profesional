@@ -5,7 +5,8 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { orienta } from '../../src/api/orienta';
-import { COLORS, CATEGORIAS, cop, catLabel, haceTiempo, fmtFecha } from '../../src/config';
+import { COLORS, cop, haceTiempo, fmtFecha } from '../../src/config';
+import { useCatalogo } from '../../src/lib/catalogo';
 
 const ESTADOS = [
   { id: '', label: 'Todas' },
@@ -22,6 +23,7 @@ const estadoTag = {
 };
 
 export default function Historial() {
+  const { categorias, catLabel } = useCatalogo();
   const router = useRouter();
   const [estado, setEstado] = useState('');
   const [categoria, setCategoria] = useState('');
@@ -56,7 +58,7 @@ export default function Historial() {
       <FiltroChips data={ESTADOS} value={estado} onChange={setEstado} keyId="id" />
       {/* Filtro por categoría */}
       <FiltroChips
-        data={[{ id: '', label: 'Toda categoría' }, ...CATEGORIAS]}
+        data={[{ id: '', label: 'Toda categoría' }, ...categorias]}
         value={categoria} onChange={setCategoria} keyId="id"
       />
 
