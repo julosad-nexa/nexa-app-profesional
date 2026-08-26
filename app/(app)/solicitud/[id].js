@@ -6,7 +6,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { orienta, adjuntoUrl } from '../../../src/api/orienta';
 import { useAuth } from '../../../src/store/auth';
@@ -22,6 +22,7 @@ export default function SolicitudDetalle() {
   const { catLabel } = useCatalogo();
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const qc = useQueryClient();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const token = useAuth((s) => s.token);
@@ -40,8 +41,29 @@ export default function SolicitudDetalle() {
 
   const aceptar = useMutation({
     mutationFn: () => orienta.aceptar(id),
-    onSuccess: () => q.refetch(),
-    onError: (e) => Alert.alert('No se pudo aceptar', e.message),
+    onSuccess: () => {
+      // Ya es suya: el feed no debe seguir ofreciéndola mientras llega el siguiente poll.
+      qc.invalidateQueries({ queryKey: ['feed'] });
+      q.refetch();
+    },
+    onError: (e) => {
+      // 409 no es un fallo: es el marketplace funcionando. Otro médico llegó antes,
+      // o la solicitud expiró por SLA. Presentarlo como error asusta sin motivo y,
+      // peor, deja al médico varado en una solicitud que ya no puede atender.
+      //
+      // Este caso se volvió más frecuente a propósito: el servidor antes se comía el
+      // resultado de la asignación y le respondía "aceptada" al que perdía la carrera.
+      if (e?.status === 409) {
+        qc.invalidateQueries({ queryKey: ['feed'] });
+        Alert.alert(
+          'Ya no está disponible',
+          e.message || 'Otro médico la tomó primero.',
+          [{ text: 'Volver', onPress: () => router.back() }],
+        );
+        return;
+      }
+      Alert.alert('No se pudo aceptar', e.message);
+    },
   });
   const responder = useMutation({
     mutationFn: () => orienta.responder(id, texto.trim()),
