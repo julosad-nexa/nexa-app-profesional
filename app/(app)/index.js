@@ -62,17 +62,42 @@ export default function Home() {
     onError: (e) => Alert.alert('No se pudo cambiar el estado', e?.message || 'Error de red'),
   });
 
-  // Heartbeat: mantiene viva la disponibilidad en Redis (TTL 8 min) mientras esté
-  // Disponible. Sin esto el médico "cae" del índice a los 8 min sin darse cuenta.
-  // También re-pinga y refresca el feed al volver la app a primer plano.
+  // Latido de disponibilidad + entrada/salida de turno al cambiar de app.
+  //
+  // ── EL LATIDO ────────────────────────────────────────────────────────────────
+  // Mantiene viva la disponibilidad en Redis (TTL 8 min) mientras esté Disponible.
+  // Sin esto el médico "cae" del índice a los 8 min sin darse cuenta.
+  //
+  // ── POR QUÉ TAMBIÉN SE SALE DEL TURNO ────────────────────────────────────────
+  // Si la app se va a segundo plano, los timers de JS dejan de correr: el latido
+  // se detiene y el médico sigue figurando disponible hasta que el TTL caduca. En
+  // esa ventana es un fantasma — el despacho le manda solicitudes que nadie está
+  // mirando, y cada una le quita el turno a un médico que sí habría respondido.
+  // Con pocos médicos conectados, eso es exactamente lo que rompe el SLA.
+  //
+  // Por eso al pasar a segundo plano nos damos de baja explícitamente, y al volver
+  // nos damos de alta otra vez. `disponible` sigue representando la INTENCIÓN del
+  // médico (el interruptor que él dejó puesto); Redis representa si está de verdad
+  // al pie del cañón ahora mismo. Son cosas distintas y conviene no confundirlas.
+  //
+  // Solo reaccionamos a 'background': en iOS 'inactive' salta por cosas pasajeras
+  // —una llamada entrante, bajar el centro de notificaciones— y no significa que el
+  // médico se haya ido.
   useEffect(() => {
     if (!disponible) return;
-    const ping = () => orienta.setDisponibilidad(true, savedTarifa, savedCats).catch(() => {});
-    const id = setInterval(ping, HEARTBEAT_MS);
+
+    const entrar = () => orienta.setDisponibilidad(true, savedTarifa, savedCats).catch(() => {});
+    const salir  = () => orienta.setDisponibilidad(false, savedTarifa, savedCats).catch(() => {});
+
+    const id = setInterval(entrar, HEARTBEAT_MS);
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') { ping(); feed.refetch(); }
+      if (s === 'active') { entrar(); feed.refetch(); }
+      else if (s === 'background') { salir(); }
     });
-    return () => { clearInterval(id); sub.remove(); };
+
+    // Al desmontar (logout, cierre) también se sale: mejor un turno de menos que un
+    // fantasma recibiendo pacientes.
+    return () => { clearInterval(id); sub.remove(); salir(); };
   }, [disponible, savedTarifa, savedCats]);
 
   // Alerta (vibración) cuando llega una solicitud nueva al feed estando Disponible.
