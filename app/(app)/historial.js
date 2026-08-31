@@ -3,8 +3,11 @@ import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { orienta } from '../../src/api/orienta';
+
+// Coincide con el tope por defecto del backend.
+const PAGINA = 30;
 import { COLORS, cop, haceTiempo, fmtFecha } from '../../src/config';
 import { useCatalogo } from '../../src/lib/catalogo';
 
@@ -36,11 +39,28 @@ export default function Historial() {
     onSearch._t = setTimeout(() => setQDebounced(v.trim()), 400);
   };
 
-  const query = useQuery({
+  /*
+   * Paginado, no los 30 primeros y punto.
+   *
+   * El backend acepta `limit`/`offset` (tope 100) y la app no los pasaba: se
+   * quedaba con las 30 orientaciones más recientes y no había forma de ver más.
+   * Para un médico con trabajo acumulado eso significa perder de vista lo suyo —
+   * y es justo la pantalla donde comprobaría qué le han pagado.
+   */
+  const query = useInfiniteQuery({
     queryKey: ['historial', estado, categoria, qDebounced],
-    queryFn: () => orienta.historial({ estado, categoria, q: qDebounced }),
+    queryFn: ({ pageParam = 0 }) =>
+      orienta.historial({ estado, categoria, q: qDebounced, limit: PAGINA, offset: pageParam }),
+    initialPageParam: 0,
+    // Si la página vino llena, asumimos que hay más. Es una página de más en el
+    // peor caso, a cambio de no pedirle al backend que devuelva un total.
+    getNextPageParam: (ultima, todas) => {
+      const n = (ultima?.historial || []).length;
+      return n < PAGINA ? undefined : todas.length * PAGINA;
+    },
   });
-  const items = query.data?.historial || [];
+
+  const items = (query.data?.pages || []).flatMap((p) => p?.historial || []);
 
   return (
     <View style={st.c}>
@@ -69,8 +89,24 @@ export default function Historial() {
           contentContainerStyle={{ padding: 16, paddingTop: 6 }}
           data={items}
           keyExtractor={(x) => String(x.id)}
-          refreshControl={<RefreshControl refreshing={query.isFetching} onRefresh={query.refetch} />}
+          refreshControl={<RefreshControl refreshing={query.isFetching && !query.isFetchingNextPage} onRefresh={query.refetch} />}
           ListEmptyComponent={<Text style={st.empty}>Sin orientaciones con estos filtros.</Text>}
+          ListFooterComponent={
+            query.hasNextPage ? (
+              <TouchableOpacity
+                style={st.masBtn}
+                onPress={() => query.fetchNextPage()}
+                disabled={query.isFetchingNextPage}
+                activeOpacity={0.8}
+              >
+                <Text style={st.masT}>
+                  {query.isFetchingNextPage ? 'Cargando…' : 'Ver más'}
+                </Text>
+              </TouchableOpacity>
+            ) : items.length > 0 ? (
+              <Text style={st.finLista}>No hay más orientaciones.</Text>
+            ) : null
+          }
           renderItem={({ item }) => {
             const tag = estadoTag[item.estado] || { t: item.estado, c: COLORS.ink2, bg: '#EEF2F7' };
             return (
@@ -115,6 +151,9 @@ function FiltroChips({ data, value, onChange, keyId }) {
 }
 
 const st = StyleSheet.create({
+  masBtn: { margin: 16, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: COLORS.line, alignItems: 'center' },
+  masT: { color: COLORS.teal, fontWeight: '700' },
+  finLista: { textAlign: 'center', color: COLORS.ink2, fontSize: 12, paddingVertical: 18 },
   c: { flex: 1, backgroundColor: COLORS.bg },
   searchWrap: { padding: 12, paddingBottom: 6 },
   search: { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.line, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: COLORS.ink },

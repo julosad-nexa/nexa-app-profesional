@@ -34,7 +34,20 @@ export default function SolicitudDetalle() {
   const q = useQuery({
     queryKey: ['solicitud', id],
     queryFn: () => orienta.detalle(id),
-    refetchInterval: 5000,
+    /*
+     * Solo se sondea mientras la orientación está viva.
+     *
+     * Antes eran 5 segundos para siempre: una orientación cerrada abierta en
+     * pantalla seguía pidiendo al servidor cada 5 s indefinidamente. Con un
+     * médico da igual; con varios y la app olvidada en una pestaña, es tráfico
+     * constante que no aporta nada.
+     */
+    refetchInterval: (q) => {
+      const estado = q?.state?.data?.solicitud?.estado;
+      return (estado === 'cerrada' || estado === 'reembolsada' || estado === 'expirada')
+        ? false
+        : 5000;
+    },
   });
   const sol = q.data?.solicitud;
   const mensajes = q.data?.mensajes || [];

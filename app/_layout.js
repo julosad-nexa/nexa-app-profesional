@@ -43,3 +43,10 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+/**
+ * Expo Router monta esto si algo revienta al renderizar, en vez de dejar la
+ * pantalla en blanco. Se exporta desde el layout RAÍZ para que cubra tambien
+ * los fallos de la pantalla de login.
+ */
+export { PantallaDeError as ErrorBoundary } from '../src/components/ErrorBoundary';
