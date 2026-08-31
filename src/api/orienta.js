@@ -58,4 +58,8 @@ export const orienta = {
 
   registrarPush: (token) =>
     O('/orienta/push/registrar', { method: 'POST', body: { token } }),
+
+  // Retira este dispositivo de los avisos. Se llama al cerrar sesión, mientras
+  // el JWT todavía sirve.
+  bajaPush: () => O('/orienta/push/baja', { method: 'POST' }),
 };

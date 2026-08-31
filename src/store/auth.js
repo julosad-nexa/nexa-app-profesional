@@ -63,6 +63,33 @@ export const useAuth = create((set, get) => ({
   },
 
   async logout() {
+    /*
+     * Dar de baja el dispositivo ANTES de tirar el token.
+     *
+     * El push token vive en el servidor (`orienta:push:{userId}`) y no se
+     * borraba al salir: el teléfono seguía recibiendo avisos de pacientes
+     * aunque el médico hubiera cerrado sesión, o aunque el aparato hubiera
+     * cambiado de manos.
+     *
+     * El orden importa: la baja necesita el JWT, así que va primero. Y si falla
+     * —sin red, servidor caído— se cierra la sesión igualmente: dejar a alguien
+     * atrapado dentro de la app por no poder avisar al servidor sería peor. El
+     * TTL de 90 días del token es la red de seguridad para ese caso.
+     */
+    const tok = get().token;
+    if (tok) {
+      try {
+        // Petición directa, sin pasar por el cliente HTTP: importarlo aquí crearía
+        // un ciclo (orienta → client → auth → orienta).
+        await fetch(`${API.orienta}/orienta/push/baja`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        });
+      } catch (e) {
+        console.warn('[NEXA][logout] no se pudo dar de baja el push:', e?.message);
+      }
+    }
+
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(REFRESH_KEY);
     set({ token: null, refreshToken: null });

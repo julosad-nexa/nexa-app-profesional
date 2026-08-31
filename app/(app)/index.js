@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, Switch, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert, AppState,
 } from 'react-native';
@@ -7,7 +7,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { orienta } from '../../src/api/orienta';
 import { useAuth } from '../../src/store/auth';
 import { registerPush } from '../../src/lib/push';
-import { prepararAlertas, alertaNuevaSolicitud } from '../../src/lib/alerta';
+import { prepararAlertas } from '../../src/lib/alerta';
 import { COLORS, DEFAULT_CATS, haceTiempo } from '../../src/config';
 import { useCatalogo } from '../../src/lib/catalogo';
 
@@ -100,18 +100,10 @@ export default function Home() {
     return () => { clearInterval(id); sub.remove(); salir(); };
   }, [disponible, savedTarifa, savedCats]);
 
-  // Alerta (vibración) cuando llega una solicitud nueva al feed estando Disponible.
-  const knownIdsRef = useRef(null); // null = feed aún no cargado
-  useEffect(() => {
-    if (!disponible) { knownIdsRef.current = null; return; }
-    const items = feed.data?.feed || [];
-    const ids = new Set(items.map((x) => x.id));
-    if (knownIdsRef.current) {
-      const nuevos = items.filter((x) => !knownIdsRef.current.has(x.id)).length;
-      if (nuevos > 0) alertaNuevaSolicitud(nuevos);
-    }
-    knownIdsRef.current = ids;
-  }, [feed.data, disponible]);
+  // La alerta de solicitud nueva NO vive aquí: subió a `_layout.js` con
+  // `useVigilanciaSolicitudes()`, para que suene también cuando el médico está en
+  // otra pantalla. Esta pantalla solo pinta el feed; comparte la clave ['feed'] con
+  // la vigilancia, así que React Query agrupa las peticiones y no se duplican.
 
   return (
     <View style={st.c}>
