@@ -8,14 +8,20 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "backgroundColor": "#0A1B3F"
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2DD8C1"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.nexasalud.profesional"
     },
     "android": {
-      "package": "com.nexasalud.profesional"
+      "package": "com.nexasalud.profesional",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2DD8C1"
+      }
     },
     "plugins": [
       "expo-router",
@@ -30,6 +36,13 @@
     "extra": {
       "router": {},
       "nexaEnv": "qa"
+    },
+    "icon": "./assets/icon.png",
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }
