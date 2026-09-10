@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { orienta, adjuntoUrl } from '../../../src/api/orienta';
+import FichaPaciente from '../../../src/components/FichaPaciente';
 import { useAuth } from '../../../src/store/auth';
 import { COLORS, PLANTILLAS, cop } from '../../../src/config';
 import { useCatalogo } from '../../../src/lib/catalogo';
@@ -51,6 +52,9 @@ export default function SolicitudDetalle() {
   });
   const sol = q.data?.solicitud;
   const mensajes = q.data?.mensajes || [];
+  // El servidor solo la manda al médico asignado: mientras la solicitud está en
+  // el feed, aquí no hay nada y la ficha no se pinta.
+  const paciente = q.data?.paciente;
 
   const aceptar = useMutation({
     mutationFn: () => orienta.aceptar(id),
@@ -151,7 +155,9 @@ export default function SolicitudDetalle() {
       behavior="padding"
       keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : insets.bottom}
     >
-      <Stack.Screen options={{ title: `Solicitud #${id}` }} />
+      {/* Con paciente asignado manda su nombre; el número solo sirve para
+          soporte y no le dice nada al médico que está atendiendo. */}
+      <Stack.Screen options={{ title: paciente?.nombre || `Solicitud #${id}` }} />
 
       {q.isLoading || !sol ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={COLORS.teal} />
@@ -161,6 +167,8 @@ export default function SolicitudDetalle() {
             <View style={st.badge}><Text style={st.badgeT}>{catLabel(sol.categoria)}</Text></View>
             <Text style={st.estado}>{sol.estado}</Text>
           </View>
+          <FichaPaciente paciente={paciente} />
+
           <Text style={st.pregunta}>{sol.texto}</Text>
 
           {intake.length > 0 && (
