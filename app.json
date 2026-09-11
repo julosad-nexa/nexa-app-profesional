@@ -6,12 +6,6 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#2DD8C1"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.nexasalud.profesional"
@@ -25,6 +19,15 @@
     },
     "plugins": [
       "expo-router",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#2DD8C1"
+        }
+      ],
       "expo-secure-store",
       [
         "expo-notifications",
