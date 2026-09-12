@@ -1,5 +1,7 @@
 import { request, upload } from './client';
 import { API } from '../config';
+import { subirImagen } from '../lib/archivo';
+import { useAuth } from '../store/auth';
 
 const O = (path, opts) => request(API.orienta, path, opts);
 
@@ -48,12 +50,23 @@ export const orienta = {
   derivar: (id, motivo = '') =>
     O(`/orienta/solicitudes/${id}/derivar`, { method: 'POST', body: { motivo } }),
 
-  enviarAdjunto: (id, asset) => {
-    const type = asset.mimeType || 'image/jpeg';
-    const ext = (type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
-    const form = new FormData();
-    form.append('file', { uri: asset.uri, name: asset.fileName || `foto.${ext}`, type });
-    return upload(API.orienta, `/orienta/solicitudes/${id}/adjunto`, form);
+  /*
+   * La subida NO pasa por fetch+FormData en el teléfono.
+   *
+   * El atajo `{uri, name, type}` murió con la nueva arquitectura, y leer el
+   * archivo con fetch para armar un blob es peor: sobre un `file://` devuelve
+   * «File not found» y eso acababa guardado como si fuera la foto. `subirImagen`
+   * entrega el archivo del disco directamente.
+   */
+  enviarAdjunto: async (id, asset) => {
+    const token = useAuth.getState().token;
+    const res = await subirImagen({
+      url: `${API.orienta}/orienta/solicitudes/${id}/adjunto`,
+      asset,
+      token,
+    });
+    if (!res.ok) throw new Error(res.data?.error || 'No se pudo subir la imagen.');
+    return res.data;
   },
 
   registrarPush: (token) =>
