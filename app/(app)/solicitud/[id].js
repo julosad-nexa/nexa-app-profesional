@@ -97,6 +97,18 @@ export default function SolicitudDetalle() {
   const finalizar = useMutation({
     mutationFn: () => orienta.cerrar(id),
     onSuccess: (res) => {
+      /*
+       * Esta orientacion ya no esta en curso en ningun sitio.
+       *
+       * Faltaba por completo: se cerraba, se volvia atras con `router.back()` y
+       * el historial —que sigue montado debajo en la pila, sin desmontarse—
+       * seguia mostrandola «en curso». Tambien sale del feed, y los pagos
+       * acaban de cambiar porque esta orientacion se acaba de liquidar.
+       */
+      qc.invalidateQueries({ queryKey: ['historial'] });
+      qc.invalidateQueries({ queryKey: ['feed'] });
+      qc.invalidateQueries({ queryKey: ['payouts'] });
+
       if (res?.estado === 'reembolsada' || res?.sin_atencion) {
         Alert.alert('Sin atención registrada',
           'No respondiste al paciente, así que se reembolsó su crédito y no hay pago por esta orientación.',
@@ -112,7 +124,7 @@ export default function SolicitudDetalle() {
   });
   const derivar = useMutation({
     mutationFn: () => orienta.derivar(id),
-    onSuccess: () => q.refetch(),
+    onSuccess: () => { q.refetch(); qc.invalidateQueries({ queryKey: ['historial'] }); },
     onError: (e) => Alert.alert('No se pudo derivar', e.message),
   });
 

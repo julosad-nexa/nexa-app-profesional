@@ -10,6 +10,7 @@ import { orienta } from '../../src/api/orienta';
 const PAGINA = 30;
 import { COLORS, cop, haceTiempo, fmtFecha } from '../../src/config';
 import { useCatalogo } from '../../src/lib/catalogo';
+import { useRefrescarAlVolver } from '../../src/lib/refrescar';
 
 const ESTADOS = [
   { id: '', label: 'Todas' },
@@ -59,6 +60,10 @@ export default function Historial() {
       return n < PAGINA ? undefined : todas.length * PAGINA;
     },
   });
+
+  // Una orientacion pudo cerrarla el paciente mientras el medico no miraba:
+  // sin esto el historial se queda diciendo «en curso» sobre algo terminado.
+  useRefrescarAlVolver(() => query.refetch());
 
   const items = (query.data?.pages || []).flatMap((p) => p?.historial || []);
 
