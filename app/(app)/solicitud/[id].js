@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, ActivityIndicator,
   KeyboardAvoidingView, Platform, Modal, ScrollView, Image,
@@ -13,6 +13,8 @@ import FichaPaciente from '../../../src/components/FichaPaciente';
 import { useAuth } from '../../../src/store/auth';
 import { COLORS, PLANTILLAS, cop } from '../../../src/config';
 import { useCatalogo } from '../../../src/lib/catalogo';
+import { useLatido, useEscribiendo } from '../../../src/lib/latido';
+import PulsoChat from '../../../src/components/PulsoChat';
 
 const INTAKE = [
   ['edad', 'Edad'], ['sexo', 'Sexo'], ['evolucion', 'Evolución'],
@@ -147,6 +149,22 @@ export default function SolicitudDetalle() {
   const usarPlantilla = (x) => { setTexto((p) => (p ? `${p}\n${x}` : x)); setPlantillasOpen(false); };
 
   const puedeChatear = sol && ['asignada', 'respondida'].includes(sol.estado);
+
+  /*
+   * Pulso del chat, aparte del sondeo de 5 s de React Query. Solo con la
+   * conversación viva: en el feed todavía no hay una relación con nadie.
+   */
+  const pedirLatido = useCallback(() => orienta.latido(id), [id]);
+  const latido = useLatido({
+    pedir: pedirLatido,
+    activo: !!puedeChatear,
+    // El latido se entera antes que el refetch lento de que hay mensaje nuevo.
+    alHaberMensajes: () => q.refetch(),
+  });
+  const avisarEscribiendo = useEscribiendo({
+    avisar: (v) => orienta.escribiendo(id, v),
+    activo: !!puedeChatear,
+  });
   const intake = (sol?.contexto && INTAKE.filter(([k]) => sol.contexto[k])) || [];
 
   return (
@@ -222,6 +240,7 @@ export default function SolicitudDetalle() {
           {puedeChatear && (
             <>
               <Text style={st.disc}>Teleorientación: orientación general, sin diagnóstico ni fórmula. Ante señales de alarma, deriva a urgencias.</Text>
+              <PulsoChat latido={latido} nombre={paciente?.nombre || 'El paciente'} />
               <View style={st.inputRow}>
                 <TouchableOpacity style={st.tool} onPress={() => setPlantillasOpen(true)}><Text style={st.toolT}>＋</Text></TouchableOpacity>
                 <TouchableOpacity style={st.tool} onPress={elegirImagen} disabled={adjuntar.isPending}>
@@ -229,7 +248,7 @@ export default function SolicitudDetalle() {
                 </TouchableOpacity>
                 <TextInput
                   style={st.in} placeholder="Escribe tu orientación…" placeholderTextColor="#94A3B8"
-                  value={texto} onChangeText={setTexto} multiline
+                  value={texto} onChangeText={(v) => { setTexto(v); avisarEscribiendo(); }} multiline
                 />
                 <TouchableOpacity
                   style={[st.send, { opacity: texto.trim() ? 1 : 0.5 }]}

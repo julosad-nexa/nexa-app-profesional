@@ -39,6 +39,16 @@ export const orienta = {
 
   detalle: (id) => O(`/orienta/solicitudes/${id}`),
 
+  /**
+   * Pulso del chat: si el paciente esta escribiendo, si esta en linea y cuantos
+   * mensajes lleva el hilo. Se pide cada 2 s, asi que devuelve lo minimo.
+   */
+  latido: (id) => O(`/orienta/solicitudes/${id}/latido`),
+
+  /** Avisar de que estamos escribiendo (el cliente se frena solo, no va por tecla). */
+  escribiendo: (id, valor = true) =>
+    O(`/orienta/solicitudes/${id}/escribiendo`, { method: 'POST', body: { escribiendo: valor } }),
+
   aceptar: (id) => O(`/orienta/solicitudes/${id}/aceptar`, { method: 'POST' }),
 
   responder: (id, texto) =>
