@@ -34,7 +34,14 @@
         {}
       ],
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "NexaExpress usa tus fotos para que puedas enviarle una imagen al paciente que atiendes.",
+          "cameraPermission": "NexaExpress usa la cámara para que puedas enviarle una foto al paciente que atiendes."
+        }
+      ]
     ],
     "extra": {
       "router": {},
