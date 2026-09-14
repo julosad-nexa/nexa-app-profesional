@@ -16,14 +16,23 @@ import { Platform } from 'react-native';
  *    que acababa subido y guardado como si fuera la foto. 14 bytes en disco y
  *    dos apps mostrando «no se puede cargar la imagen».
  *
- * `uploadAsync` de expo-file-system no pasa por JavaScript: entrega el archivo
- * del disco directamente al servidor, con su multipart y su mime. No hay blob
- * que etiquetar ni cuerpo que confundir con un error.
+ * ── Y POR QUÉ TAMPOCO `FileSystem.uploadAsync` ───────────────────────────────
+ * Fue el tercer intento fallido, y el que más costó ver porque el código
+ * «parecía» bien: en el SDK 57 `uploadAsync` y `FileSystemUploadType` YA NO
+ * están en `expo-file-system`; se quedaron en `expo-file-system/legacy`. Al
+ * importar el módulo normal ambos llegaban `undefined`, así que la llamada
+ * moría leyendo `.MULTIPART` de `undefined` —antes de enviar un solo byte— y lo
+ * único que se veía arriba era un error genérico de subida.
+ *
+ * La API de verdad del SDK 57 es `new File(uri).upload(url, opciones)`: entrega
+ * el archivo del disco al servidor sin pasar por JavaScript, igual que hacía la
+ * vieja, pero es la que existe. No hay blob que etiquetar ni cuerpo que
+ * confundir con un error.
  *
  * ── Y EN WEB ─────────────────────────────────────────────────────────────────
- * Allí `uploadAsync` no existe, pero tampoco hace falta: el `uri` del selector
- * es un `blob:`/`data:` que el navegador sí sabe leer, y `FormData` funciona
- * como en cualquier página. Por eso hay dos caminos y no uno.
+ * Allí no hay módulo nativo, pero tampoco hace falta: el `uri` del selector es
+ * un `blob:`/`data:` que el navegador sí sabe leer, y `FormData` funciona como
+ * en cualquier página. Por eso hay dos caminos y no uno.
  */
 
 const MIMES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
@@ -58,13 +67,22 @@ export async function subirImagen({ url, asset, token }) {
 
   // Import diferido: en web el módulo nativo no existe y cargarlo arriba
   // rompería el bundle del navegador.
-  const FileSystem = await import('expo-file-system');
-  const res = await FileSystem.uploadAsync(url, asset.uri, {
+  const { File, UploadType } = await import('expo-file-system');
+
+  // Si el módulo no trae lo que esperamos, decirlo ASÍ y no dejar que reviente
+  // como «cannot read property of undefined»: ese disfraz ya costó una tarde.
+  if (!File || !UploadType) {
+    throw new Error('La app no pudo acceder al archivo (expo-file-system incompleto).');
+  }
+
+  const archivo = new File(asset.uri);
+  if (!archivo.exists) throw new Error('No encontramos la imagen seleccionada.');
+
+  const res = await archivo.upload(url, {
     httpMethod: 'POST',
-    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    uploadType: UploadType.MULTIPART,
     fieldName: 'file',
     mimeType: tipo,
-    parameters: {},
     headers,
   });
 
