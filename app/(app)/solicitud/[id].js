@@ -57,6 +57,8 @@ export default function SolicitudDetalle() {
   // El servidor solo la manda al médico asignado: mientras la solicitud está en
   // el feed, aquí no hay nada y la ficha no se pinta.
   const paciente = q.data?.paciente;
+  // Solo llega cuando la orientacion esta cerrada y quien mira es el medico.
+  const liquidacion = q.data?.liquidacion;
 
   const aceptar = useMutation({
     mutationFn: () => orienta.aceptar(id),
@@ -289,7 +291,40 @@ export default function SolicitudDetalle() {
             </>
           )}
 
-          {sol.estado === 'cerrada' && <Text style={st.closed}>Esta orientación fue cerrada.</Text>}
+          {/* Cierre.
+
+              Antes esto era una linea de texto gris que decia «Esta orientacion
+              fue cerrada» y nada mas. Cuando cerraba el PACIENTE —que es lo
+              normal— el medico no se enteraba: la pantalla simplemente dejaba de
+              aceptar mensajes, sin decir por que ni cuanto habia ganado. La cifra
+              solo viajaba en la respuesta de `cerrar()`, o sea unicamente si
+              pulsaba el boton el. */}
+          {(sol.estado === 'cerrada' || sol.estado === 'reembolsada') && (
+            <View style={sol.estado === 'reembolsada' ? st.cierreAviso : st.cierreOk}>
+              <Text style={st.cierreTitulo}>
+                {sol.estado === 'reembolsada' ? 'Orientación reembolsada' : 'Orientación finalizada'}
+              </Text>
+
+              {sol.estado === 'reembolsada' ? (
+                <Text style={st.cierreTexto}>
+                  No se registró atención, así que se devolvió el crédito al paciente y no hay pago por esta orientación.
+                </Text>
+              ) : liquidacion ? (
+                <>
+                  <Text style={st.cierreMonto}>{cop(liquidacion.neto_medico)}</Text>
+                  <Text style={st.cierreTexto}>
+                    {liquidacion.estado_payout === 'liquidado'
+                      ? 'Ya está pagado.'
+                      : 'Se suma a tu próximo pago.'}
+                  </Text>
+                </>
+              ) : (
+                // Cerrada sin transaccion: pasa si la cerro el paciente antes de
+                // que hubiera respuesta. No se inventa un numero.
+                <Text style={st.cierreTexto}>Esta orientación se cerró.</Text>
+              )}
+            </View>
+          )}
         </>
       )}
 
@@ -392,6 +427,11 @@ const st = StyleSheet.create({
   finishT: { color: COLORS.tealD, fontWeight: '800', fontSize: 14 },
   finishHint: { fontSize: 11, color: '#92400E', paddingHorizontal: 16, paddingBottom: 6 },
   closed: { textAlign: 'center', color: COLORS.ink2, padding: 16 },
+  cierreOk:    { margin: 16, padding: 18, borderRadius: 14, backgroundColor: '#EDF6F0', borderWidth: 1, borderColor: '#9BD9C6', alignItems: 'center' },
+  cierreAviso: { margin: 16, padding: 18, borderRadius: 14, backgroundColor: '#FDF6E7', borderWidth: 1, borderColor: '#EBD3A0', alignItems: 'center' },
+  cierreTitulo:{ fontSize: 16, fontWeight: '700', color: COLORS.navy, marginBottom: 6, textAlign: 'center' },
+  cierreMonto: { fontSize: 30, fontWeight: '800', color: COLORS.tealD, marginBottom: 4 },
+  cierreTexto: { fontSize: 13.5, color: COLORS.ink2, textAlign: 'center', lineHeight: 19 },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: '70%' },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: COLORS.ink, marginBottom: 12 },
