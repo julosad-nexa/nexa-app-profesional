@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useHeaderHeight } from "expo-router/react-navigation";
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { orienta, adjuntoUrl } from '../../../src/api/orienta';
@@ -27,7 +26,6 @@ export default function SolicitudDetalle() {
   const router = useRouter();
   const qc = useQueryClient();
   const headerHeight = useHeaderHeight();
-  const insets = useSafeAreaInsets();
   const token = useAuth((s) => s.token);
   const [texto, setTexto] = useState('');
   const [plantillasOpen, setPlantillasOpen] = useState(false);
@@ -184,8 +182,17 @@ export default function SolicitudDetalle() {
   return (
     <KeyboardAvoidingView
       style={st.c}
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : insets.bottom}
+      /*
+       * En Android el sistema ya redimensiona la ventana al abrir el teclado
+       * (`adjustResize`), asi que un `behavior` encima suma su propio
+       * desplazamiento al que ya hizo el sistema y el campo de texto termina
+       * empujado fuera de la pantalla. Por eso alli no se le da ninguno.
+       *
+       * En iOS no hay redimension y hay que hacerlo a mano, contando la altura
+       * del header de navegacion o el teclado tapa justo lo que se escribe.
+       */
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
     >
       {/* Con paciente asignado manda su nombre; el número solo sirve para
           soporte y no le dice nada al médico que está atendiendo. */}
@@ -199,26 +206,36 @@ export default function SolicitudDetalle() {
             <View style={st.badge}><Text style={st.badgeT}>{catLabel(sol.categoria)}</Text></View>
             <Text style={st.estado}>{sol.estado}</Text>
           </View>
-          <FichaPaciente paciente={paciente} />
-
-          <Text style={st.pregunta}>{sol.texto}</Text>
-
-          {intake.length > 0 && (
-            <View style={st.intake}>
-              {intake.map(([k, label]) => (
-                <View key={k} style={st.intakeItem}>
-                  <Text style={st.intakeLabel}>{label}</Text>
-                  <Text style={st.intakeValue}>{String(sol.contexto[k])}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
           <FlatList
             style={{ flex: 1 }}
             contentContainerStyle={{ padding: 16 }}
             data={mensajes}
             keyExtractor={(_, i) => String(i)}
+            /*
+             * La ficha, la consulta y el intake iban FUERA de la lista, así que
+             * ocupaban altura fija encima del chat y no se podían apartar. Con el
+             * teclado abierto se comían el sitio del campo de texto, que acababa
+             * fuera de la pantalla.
+             *
+             * Como cabecera de la lista hacen scroll con los mensajes: se leen al
+             * entrar y desaparecen al bajar, que es justo lo que se quiere.
+             */
+            ListHeaderComponent={
+              <>
+                <FichaPaciente paciente={paciente} />
+                <Text style={st.pregunta}>{sol.texto}</Text>
+                {intake.length > 0 && (
+                  <View style={st.intake}>
+                    {intake.map(([k, label]) => (
+                      <View key={k} style={st.intakeItem}>
+                        <Text style={st.intakeLabel}>{label}</Text>
+                        <Text style={st.intakeValue}>{String(sol.contexto[k])}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
+            }
             ListEmptyComponent={
               sol.estado === 'buscando'
                 ? <Text style={st.info}>Acepta para atender esta orientación.</Text>

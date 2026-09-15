@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { COLORS } from '../config';
 
 /**
@@ -45,12 +46,39 @@ export default function FichaPaciente({ paciente }) {
     ],
   ].filter(Boolean);
 
+  /*
+   * Plegada por defecto.
+   *
+   * La ficha ocupaba siete datos en rejilla de forma permanente, encima del
+   * chat: en un telefono eso es un tercio de la pantalla robado a la
+   * conversacion, y con el teclado abierto no quedaba sitio para escribir.
+   *
+   * Lo que se necesita de un vistazo es a quien se atiende y su edad y sexo, que
+   * es lo que cambia una orientacion. El resto se consulta cuando hace falta, y
+   * casi nunca hace falta.
+   */
+  const [abierta, setAbierta] = useState(false);
+
+  // Los dos datos que mas pesan en como se responde, en una linea.
+  const resumen = [
+    edad != null && `${edad} años`,
+    genero && capitalizar(genero),
+  ].filter(Boolean).join(' · ');
+
   return (
     <View style={st.caja}>
-      <Text style={st.encabezado}>PACIENTE</Text>
-      <Text style={st.nombre}>{nombre}</Text>
+      <Pressable onPress={() => setAbierta((v) => !v)} style={st.cabecera} hitSlop={8}>
+        <View style={st.cabeceraTexto}>
+          <Text style={st.encabezado}>PACIENTE</Text>
+          <Text style={st.nombre}>{nombre}</Text>
+          {!abierta && !!resumen && <Text style={st.resumen}>{resumen}</Text>}
+        </View>
+        {datos.length > 0 && (
+          <Text style={st.chevron}>{abierta ? '⌃' : '⌄'}</Text>
+        )}
+      </Pressable>
 
-      {datos.length > 0 && (
+      {abierta && datos.length > 0 && (
         <View style={st.rejilla}>
           {datos.map(([etiqueta, valor]) => (
             <View key={etiqueta} style={st.dato}>
@@ -78,6 +106,10 @@ const st = StyleSheet.create({
 
   rejilla:  { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, rowGap: 10 },
   dato:     { minWidth: '33%', paddingRight: 10 },
+  cabecera: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cabeceraTexto: { flex: 1 },
+  resumen:  { fontSize: 12.5, color: COLORS.ink2, marginTop: 2 },
+  chevron:  { fontSize: 18, color: COLORS.ink2, paddingLeft: 10, paddingRight: 2 },
   etiqueta: { fontSize: 10, color: COLORS.ink2, textTransform: 'uppercase', letterSpacing: 0.4 },
   valor:    { fontSize: 14, fontWeight: '700', color: COLORS.ink, marginTop: 2 },
 });
