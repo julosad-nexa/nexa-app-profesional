@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -18,6 +18,32 @@ export default function Perfil() {
   const q = useQuery({ queryKey: ['perfil'], queryFn: orienta.perfil });
   const cfg = useQuery({ queryKey: ['config-publica'], queryFn: configPublica });
   const pay = useQuery({ queryKey: ['payouts'], queryFn: orienta.payouts });
+  const dp  = useQuery({ queryKey: ['datos-pago'], queryFn: orienta.datosPago });
+
+  // Formulario de cobro. Se inicializa desde el servidor una sola vez: si se
+  // sincronizara en cada refresco, borraria lo que la persona esta escribiendo.
+  const [pago, setPago] = useState(null);
+  useEffect(() => {
+    if (dp.data && pago === null) {
+      setPago({
+        titular: dp.data.titular || '',
+        documento: dp.data.documento || '',
+        banco: dp.data.banco || '',
+        tipo_cuenta: dp.data.tipo_cuenta || 'ahorros',
+        // Nunca se precarga el numero: del servidor solo vienen los ultimos
+        // cuatro digitos, y meterlos en el campo haria creer que esta completo.
+        cuenta: '',
+        declarante_renta: !!dp.data.declarante_renta,
+        obligado_facturar: !!dp.data.obligado_facturar,
+      });
+    }
+  }, [dp.data, pago]);
+
+  const guardarPago = useMutation({
+    mutationFn: () => orienta.guardarDatosPago(pago),
+    onSuccess: () => { dp.refetch(); Alert.alert('Listo', 'Tus datos de cobro quedaron guardados.'); },
+    onError: (e) => Alert.alert('No se pudo guardar', e?.message || 'Revisa los datos.'),
+  });
 
   // Sembrar las categorías que el médico atiende (una sola vez).
   useEffect(() => {
@@ -140,6 +166,112 @@ export default function Perfil() {
             </>
           )}
 
+          {/* Datos de cobro.
+
+              Va ANTES del historial de pagos a proposito: de nada sirve ver lo
+              acumulado si no hay a donde girarlo. */}
+          <Text style={st.section}>Datos para recibir tus pagos</Text>
+
+          {!dp.data?.completo && (
+            <View style={st.avisoPago}>
+              <Text style={st.avisoPagoT}>Sin estos datos no podemos pagarte</Text>
+              <Text style={st.hint}>
+                Tus orientaciones se siguen acumulando, pero el giro no se puede hacer hasta que los completes.
+              </Text>
+            </View>
+          )}
+
+          {pago && (
+            <>
+              <Text style={st.label}>Titular de la cuenta</Text>
+              <TextInput
+                style={st.input} value={pago.titular}
+                onChangeText={(v) => setPago({ ...pago, titular: v })}
+                placeholder="Nombre completo" placeholderTextColor="#94A3B8"
+              />
+              <Text style={st.hint}>Si la cuenta no es tuya, escribe el nombre de su dueño: el banco rechaza la transferencia si no coincide.</Text>
+
+              <Text style={st.label}>Documento del titular</Text>
+              <TextInput
+                style={st.input} value={pago.documento} keyboardType="number-pad"
+                onChangeText={(v) => setPago({ ...pago, documento: v })}
+                placeholder="Cédula o NIT" placeholderTextColor="#94A3B8"
+              />
+
+              <Text style={st.label}>Banco</Text>
+              <TextInput
+                style={st.input} value={pago.banco}
+                onChangeText={(v) => setPago({ ...pago, banco: v })}
+                placeholder="Bancolombia, Davivienda…" placeholderTextColor="#94A3B8"
+              />
+
+              <Text style={st.label}>Tipo de cuenta</Text>
+              <View style={st.fila}>
+                {['ahorros', 'corriente'].map((t) => (
+                  <TouchableOpacity
+                    key={t}
+                    onPress={() => setPago({ ...pago, tipo_cuenta: t })}
+                    style={[st.chip, pago.tipo_cuenta === t && st.chipOn]}
+                  >
+                    <Text style={[st.chipT, pago.tipo_cuenta === t && st.chipTOn]}>
+                      {t === 'ahorros' ? 'Ahorros' : 'Corriente'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={st.label}>Número de cuenta</Text>
+              <TextInput
+                style={st.input} value={pago.cuenta} keyboardType="number-pad"
+                onChangeText={(v) => setPago({ ...pago, cuenta: v.replace(/[^0-9]/g, '') })}
+                placeholder={dp.data?.cuenta ? `Guardada: ${dp.data.cuenta}` : 'Solo números'}
+                placeholderTextColor="#94A3B8"
+              />
+              {!!dp.data?.cuenta && (
+                <Text style={st.hint}>Ya tienes una cuenta guardada. Escribe el número completo solo si quieres cambiarla.</Text>
+              )}
+
+              <Text style={st.label}>Situación tributaria</Text>
+              <TouchableOpacity
+                style={st.check}
+                onPress={() => setPago({ ...pago, declarante_renta: !pago.declarante_renta })}
+              >
+                <View style={[st.box, pago.declarante_renta && st.boxOn]} />
+                <Text style={st.checkT}>Declaro renta</Text>
+              </TouchableOpacity>
+              <Text style={st.hint}>
+                Define tu retención en la fuente: {pago.declarante_renta ? '11 %' : '10 %'} sobre cada pago. Se retiene desde el primer peso y la consignamos a la DIAN a tu nombre.
+              </Text>
+
+              <TouchableOpacity
+                style={st.check}
+                onPress={() => setPago({ ...pago, obligado_facturar: !pago.obligado_facturar })}
+              >
+                <View style={[st.box, pago.obligado_facturar && st.boxOn]} />
+                <Text style={st.checkT}>Facturo electrónicamente</Text>
+              </TouchableOpacity>
+              <Text style={st.hint}>
+                Si no facturas, nosotros emitimos el documento soporte por ti. No tienes que hacer nada.
+              </Text>
+
+              <TouchableOpacity
+                style={st.save}
+                onPress={() => guardarPago.mutate()}
+                disabled={guardarPago.isPending}
+              >
+                {guardarPago.isPending
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={st.saveT}>Guardar datos de cobro</Text>}
+              </TouchableOpacity>
+
+              {dp.data?.completo && !dp.data?.pila_al_dia && (
+                <Text style={st.hint}>
+                  Falta que verifiquemos tu planilla de seguridad social. Es un requisito legal para poder pagarte y lo revisamos nosotros.
+                </Text>
+              )}
+            </>
+          )}
+
           {/* Historial de pagos */}
           <Text style={st.section}>Historial de pagos</Text>
           {pay.isLoading ? (
@@ -186,6 +318,19 @@ const st = StyleSheet.create({
   mValue: { color: COLORS.ink, fontSize: 18, fontWeight: '800', marginTop: 6 },
   mSub: { color: COLORS.ink2, fontSize: 10, marginTop: 1 },
   section: { color: COLORS.ink, fontSize: 16, fontWeight: '800', marginTop: 24 },
+  label: { fontSize: 13, fontWeight: '700', color: COLORS.ink, marginTop: 12, marginBottom: 5 },
+  input: { borderWidth: 1, borderColor: COLORS.line, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: COLORS.ink, backgroundColor: '#fff' },
+  avisoPago:  { backgroundColor: '#FDF6E7', borderWidth: 1, borderColor: '#EBD3A0', borderRadius: 12, padding: 14, marginBottom: 12 },
+  avisoPagoT: { fontWeight: '800', color: '#8A5A00', marginBottom: 4 },
+  fila:  { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  chip:  { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: COLORS.line },
+  chipOn:{ backgroundColor: COLORS.teal, borderColor: COLORS.teal },
+  chipT: { color: COLORS.ink2, fontWeight: '600', fontSize: 13 },
+  chipTOn:{ color: '#fff' },
+  check: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  box:   { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: COLORS.line },
+  boxOn: { backgroundColor: COLORS.teal, borderColor: COLORS.teal },
+  checkT:{ fontSize: 14.5, color: COLORS.ink, fontWeight: '500' },
   hint: { color: COLORS.ink2, fontSize: 12, marginTop: 3, marginBottom: 12, lineHeight: 17 },
   verOk: { backgroundColor: 'rgba(0,166,156,0.10)', borderWidth: 1, borderColor: COLORS.teal, borderRadius: 14, padding: 14, marginTop: 10 },
   verOkT: { color: COLORS.tealD, fontWeight: '800', fontSize: 15 },

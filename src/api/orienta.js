@@ -22,6 +22,11 @@ export const orienta = {
 
   perfil: () => O('/orienta/medico/perfil'),
 
+  // Con que datos se le gira. Sin esto no hay pago legal posible.
+  datosPago: () => O('/orienta/medico/datos-pago'),
+  guardarDatosPago: (data) =>
+    O('/orienta/medico/datos-pago', { method: 'POST', body: data }),
+
   payouts: () => O('/orienta/medico/payouts'),
 
   historial: (params = {}) => {
