@@ -183,16 +183,21 @@ export default function SolicitudDetalle() {
     <KeyboardAvoidingView
       style={st.c}
       /*
-       * En Android el sistema ya redimensiona la ventana al abrir el teclado
-       * (`adjustResize`), asi que un `behavior` encima suma su propio
-       * desplazamiento al que ya hizo el sistema y el campo de texto termina
-       * empujado fuera de la pantalla. Por eso alli no se le da ninguno.
+       * `padding` en las DOS plataformas, y el offset es la altura del header.
        *
-       * En iOS no hay redimension y hay que hacerlo a mano, contando la altura
-       * del header de navegacion o el teclado tapa justo lo que se escribe.
+       * En Android 15+ la pantalla es edge-to-edge por obligacion: la app dibuja
+       * por debajo de las barras del sistema y `adjustResize` ya no mueve el
+       * layout, aunque la ventana siga declarandolo. O sea que si aqui no se
+       * compensa nada, el teclado se monta encima del campo de texto — que es lo
+       * que pasaba. Dejarselo al sistema dejo de ser una opcion.
+       *
+       * El offset tiene que ser el alto del header de navegacion, que es lo que
+       * `KeyboardAvoidingView` no puede descontar solo: con un valor menor
+       * —antes se le pasaba el inset inferior, que son unos pocos pixeles— el
+       * desplazamiento se queda corto y el campo acaba tapado igual.
        */
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+      behavior="padding"
+      keyboardVerticalOffset={headerHeight}
     >
       {/* Con paciente asignado manda su nombre; el número solo sirve para
           soporte y no le dice nada al médico que está atendiendo. */}
@@ -209,6 +214,7 @@ export default function SolicitudDetalle() {
           <FlatList
             style={{ flex: 1 }}
             contentContainerStyle={{ padding: 16 }}
+            keyboardShouldPersistTaps="handled"
             data={mensajes}
             keyExtractor={(_, i) => String(i)}
             /*
