@@ -13,6 +13,19 @@ export const configPublica = () => request(API.wp, '/orienta/config');
 export const adjuntoUrl = (id, name, token) =>
   `${API.orienta}/orienta/solicitudes/${id}/adjunto/${name}${token ? `?t=${encodeURIComponent(token)}` : ''}`;
 
+/**
+ * Pedir la eliminacion de la cuenta.
+ *
+ * Google Play exige que esto se pueda hacer DESDE LA APP, no solo desde la web.
+ * Va contra WordPress y no contra el microservicio porque la cuenta vive alli.
+ *
+ * No manda correo ni nombre: el servidor los saca de la sesion. Pedirselos
+ * seria darle la ocasion de teclear mal el correo al que le vamos a responder,
+ * y ademas la sesion ya prueba quien es.
+ */
+export const eliminarCuenta = (motivo) =>
+  request(API.wp, '/cuenta/eliminacion', { method: 'POST', body: { confirma: true, motivo: motivo || '' } });
+
 // Endpoints del microservicio nexa-orienta consumidos por el médico.
 export const orienta = {
   setDisponibilidad: (disponible, tarifa, categorias) =>

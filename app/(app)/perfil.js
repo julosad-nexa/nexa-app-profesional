@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { orienta, configPublica } from '../../src/api/orienta';
+import { orienta, configPublica, eliminarCuenta } from '../../src/api/orienta';
 import { useAuth } from '../../src/store/auth';
 import { COLORS, cop, fmtFecha } from '../../src/config';
 import { useCatalogo } from '../../src/lib/catalogo';
@@ -12,6 +12,9 @@ import { useCatalogo } from '../../src/lib/catalogo';
 export default function Perfil() {
   const { catLabel } = useCatalogo();
   const logout = useAuth((s) => s.logout);
+  const [borrar, setBorrar]             = useState(false);
+  const [motivoBaja, setMotivoBaja]     = useState('');
+  const [enviandoBaja, setEnviandoBaja] = useState(false);
   const [cats, setCats] = useState([]);
   const [dirty, setDirty] = useState(false);
 
@@ -300,6 +303,87 @@ export default function Perfil() {
           <TouchableOpacity style={st.logout} onPress={logout} activeOpacity={0.7}>
             <Text style={st.logoutT}>Cerrar sesión</Text>
           </TouchableOpacity>
+
+          {/*
+            Eliminar cuenta.
+
+            Google Play lo exige DENTRO de la app desde 2024, no solo en la web.
+            Va en dos pasos a proposito: lo que el medico cree que hace y lo que
+            de verdad pasa no coinciden --las orientaciones que atendio y sus
+            liquidaciones NO se borran, son soporte contable y clinico-- y si eso
+            lo descubre despues, la queja es legitima.
+          */}
+          <View style={st.zona}>
+            <Text style={st.zonaT}>Eliminar mi cuenta</Text>
+            {!borrar ? (
+              <TouchableOpacity style={st.zonaBtn} onPress={() => setBorrar(true)} activeOpacity={0.7}>
+                <Text style={st.zonaBtnT}>Quiero eliminar mi cuenta</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <Text style={st.zonaItem}>· Pierdes el acceso y dejas de recibir solicitudes.</Text>
+                <Text style={st.zonaItem}>· Es definitivo: no se puede reabrir la misma cuenta.</Text>
+                <Text style={st.zonaItem}>
+                  · <Text style={st.zonaNeg}>Las orientaciones que atendiste y sus liquidaciones se
+                  conservan</Text>: son soporte clínico y contable, y la ley obliga a custodiarlos.
+                </Text>
+                <Text style={st.zonaItem}>· Si te queda un pago pendiente, se resuelve antes de cerrar.</Text>
+
+                <TextInput
+                  style={st.zonaCampo}
+                  value={motivoBaja}
+                  onChangeText={setMotivoBaja}
+                  placeholder="¿Por qué te vas? (opcional)"
+                  placeholderTextColor={COLORS.ink2}
+                  multiline
+                  editable={!enviandoBaja}
+                />
+
+                <TouchableOpacity
+                  style={[st.zonaPeligro, enviandoBaja && { opacity: 0.6 }]}
+                  disabled={enviandoBaja}
+                  activeOpacity={0.7}
+                  onPress={() => Alert.alert(
+                    '¿Enviar la solicitud?',
+                    'Vamos a cerrar tu acceso a NexaExpress. Es definitivo.',
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      {
+                        text: 'Enviar', style: 'destructive',
+                        onPress: async () => {
+                          setEnviandoBaja(true);
+                          try {
+                            const r = await eliminarCuenta(motivoBaja);
+                            setBorrar(false);
+                            setMotivoBaja('');
+                            Alert.alert(
+                              'Solicitud recibida',
+                              `Radicado ${r.radicado}. Te escribimos a ${r.email}. Por ley tenemos hasta 15 días hábiles para responder.`
+                            );
+                          } catch (e) {
+                            Alert.alert(
+                              'No pudimos enviarla',
+                              `${e?.message || 'Algo falló'}\n\nTambién puedes escribir a hola@nexasalud.com.`
+                            );
+                          } finally {
+                            setEnviandoBaja(false);
+                          }
+                        },
+                      },
+                    ]
+                  )}
+                >
+                  {enviandoBaja
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={st.zonaPeligroT}>Enviar solicitud de eliminación</Text>}
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setBorrar(false)} disabled={enviandoBaja}>
+                  <Text style={st.zonaCancel}>Cancelar</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </>
       )}
     </ScrollView>
@@ -365,4 +449,15 @@ const st = StyleSheet.create({
   payPend: { color: '#92400E' },
   logout: { padding: 16, alignItems: 'center', marginTop: 8 },
   logoutT: { color: '#B4231B', fontWeight: '700' },
+
+  zona: { backgroundColor: '#FCF1F0', borderRadius: 14, borderWidth: 1, borderColor: '#F0C9C5', padding: 16, marginTop: 4, marginBottom: 24 },
+  zonaT: { color: '#A3231B', fontWeight: '800', fontSize: 15, marginBottom: 10 },
+  zonaBtn: { borderWidth: 1.5, borderColor: '#A3231B', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  zonaBtnT: { color: '#A3231B', fontWeight: '800', fontSize: 14 },
+  zonaItem: { color: COLORS.ink2, fontSize: 13.5, lineHeight: 20, marginBottom: 5 },
+  zonaNeg: { color: COLORS.ink, fontWeight: '700' },
+  zonaCampo: { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.line, borderRadius: 10, padding: 12, minHeight: 70, textAlignVertical: 'top', color: COLORS.ink, fontSize: 14, marginTop: 12 },
+  zonaPeligro: { backgroundColor: '#A3231B', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
+  zonaPeligroT: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  zonaCancel: { textAlign: 'center', color: COLORS.ink2, fontWeight: '600', paddingVertical: 14 },
 });
