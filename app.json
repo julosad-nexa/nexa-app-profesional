@@ -46,7 +46,10 @@
     ],
     "extra": {
       "router": {},
-      "nexaEnv": "qa"
+      "nexaEnv": "qa",
+      "eas": {
+        "projectId": "78e2e862-1e8a-4c07-99e0-cbb04d528a32"
+      }
     },
     "icon": "./assets/icon.png",
     "web": {
@@ -54,6 +57,7 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "owner": "nexasalud-sas"
   }
 }
